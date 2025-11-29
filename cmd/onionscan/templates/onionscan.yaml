@@ -1,0 +1,50 @@
+# OnionScan Configuration File
+# This file configures site-specific settings for scanning Tor hidden services.
+#
+# Place this file as:
+#   - .onionscan in the current directory
+#   - .onionscan in your home directory
+#   - Or specify with --config / -c flag
+#
+# For more information, see: https://github.com/nao1215/onionscan
+
+# Default settings applied to all sites unless overridden
+defaults:
+  # Maximum crawl depth (0 = only the starting page)
+  depth: 50
+
+  # Uncomment to set default headers for all sites
+  # headers:
+  #   User-Agent: "Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0"
+
+# Site-specific configurations
+# Each key is an onion address (without http:// prefix)
+sites:
+  # Example: Configure authentication for a specific site
+  # exampleonion1234567890abcdefghijklmnopqrstuvwxyz.onion:
+  #   # Cookie to send with requests (for authenticated scanning)
+  #   cookie: "session_id=abc123; auth_token=xyz789"
+  #
+  #   # Custom HTTP headers
+  #   headers:
+  #     Authorization: "Bearer your-token-here"
+  #     X-Custom-Header: "custom-value"
+  #
+  #   # Override crawl depth for this site
+  #   depth: 100
+  #
+  #   # URL patterns to ignore during crawling (glob patterns)
+  #   ignorePatterns:
+  #     - "/logout*"
+  #     - "/admin/*"
+  #     - "*.pdf"
+  #
+  #   # URL patterns to follow (if set, only these patterns are crawled)
+  #   followPatterns:
+  #     - "/api/*"
+  #     - "/public/*"
+
+  # Example: Minimal configuration for a site
+  # anotheronion5678901234567890abcdefghijklmnopqrst.onion:
+  #   cookie: "auth=secret123"
+  #   depth: 25
