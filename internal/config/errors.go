@@ -28,4 +28,12 @@ var (
 	// ErrConflictingReportFormats is returned when both --json and --markdown
 	// are specified. Only one output format can be used at a time.
 	ErrConflictingReportFormats = errors.New("conflicting report formats: --json and --markdown cannot be used together")
+
+	// ErrInvalidCrawlDelay is returned when the crawl delay is negative.
+	// A negative delay is invalid; use 0 for no delay between requests.
+	ErrInvalidCrawlDelay = errors.New("invalid crawl delay: must be non-negative")
+
+	// ErrInvalidMaxBodySize is returned when the max body size is negative.
+	// A negative body size is invalid; use 0 to use the default limit.
+	ErrInvalidMaxBodySize = errors.New("invalid max body size: must be non-negative")
 )

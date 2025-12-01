@@ -196,6 +196,72 @@ func TestConfigValidate(t *testing.T) {
 			t.Errorf("expected no error, got %v", err)
 		}
 	})
+
+	t.Run("negative crawl delay returns ErrInvalidCrawlDelay", func(t *testing.T) {
+		t.Parallel()
+		cfg := validConfig()
+		cfg.CrawlDelay = -1 * time.Second
+
+		err := cfg.Validate()
+		if !errors.Is(err, ErrInvalidCrawlDelay) {
+			t.Errorf("expected ErrInvalidCrawlDelay, got %v", err)
+		}
+	})
+
+	t.Run("zero crawl delay is valid", func(t *testing.T) {
+		t.Parallel()
+		cfg := validConfig()
+		cfg.CrawlDelay = 0
+
+		err := cfg.Validate()
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("positive crawl delay is valid", func(t *testing.T) {
+		t.Parallel()
+		cfg := validConfig()
+		cfg.CrawlDelay = 1 * time.Second
+
+		err := cfg.Validate()
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("negative max body size returns ErrInvalidMaxBodySize", func(t *testing.T) {
+		t.Parallel()
+		cfg := validConfig()
+		cfg.MaxBodySize = -1
+
+		err := cfg.Validate()
+		if !errors.Is(err, ErrInvalidMaxBodySize) {
+			t.Errorf("expected ErrInvalidMaxBodySize, got %v", err)
+		}
+	})
+
+	t.Run("zero max body size is valid (uses default)", func(t *testing.T) {
+		t.Parallel()
+		cfg := validConfig()
+		cfg.MaxBodySize = 0
+
+		err := cfg.Validate()
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("positive max body size is valid", func(t *testing.T) {
+		t.Parallel()
+		cfg := validConfig()
+		cfg.MaxBodySize = 10 * 1024 * 1024 // 10MB
+
+		err := cfg.Validate()
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+	})
 }
 
 // TestFileGetSiteConfig tests the GetSiteConfig method.
