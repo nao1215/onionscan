@@ -16,6 +16,7 @@ import (
 
 	"github.com/nao1215/onionscan/internal/config"
 	"github.com/nao1215/onionscan/internal/database"
+	securelog "github.com/nao1215/onionscan/internal/log"
 	"github.com/nao1215/onionscan/internal/model"
 	"github.com/nao1215/onionscan/internal/pipeline"
 	"github.com/nao1215/onionscan/internal/report"
@@ -94,6 +95,16 @@ Configuration file (.onionscan) example:
 		"Output Markdown report (mutually exclusive with --json)")
 	cmd.Flags().StringP("output", "o", "",
 		"Write report to specified file path (creates directories if needed)")
+
+	// Crawler politeness flags
+	// These settings control how aggressively the crawler fetches pages.
+	// Conservative defaults are used to be respectful of hidden services.
+	cmd.Flags().DurationP("crawl-delay", "D", config.DefaultCrawlDelay,
+		"Delay between HTTP requests during crawling (politeness setting)")
+	cmd.Flags().StringP("user-agent", "A", config.DefaultUserAgent,
+		"User-Agent header for HTTP requests")
+	cmd.Flags().Int64P("max-body-size", "B", config.DefaultMaxBodySize,
+		"Maximum response body size in bytes (0 = default 5MB)")
 
 	return cmd
 }
@@ -230,6 +241,26 @@ func buildConfig(cmd *cobra.Command, args []string) (*config.Config, error) {
 	cfg.SaveToDB = true
 	cfg.DBDir = config.XDGDataDir()
 
+	// Crawler politeness settings
+	cfg.CrawlDelay, err = cmd.Flags().GetDuration("crawl-delay")
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.UserAgent, err = cmd.Flags().GetString("user-agent")
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.MaxBodySize, err = cmd.Flags().GetInt64("max-body-size")
+	if err != nil {
+		return nil, err
+	}
+	// Use default if 0 is specified
+	if cfg.MaxBodySize == 0 {
+		cfg.MaxBodySize = config.DefaultMaxBodySize
+	}
+
 	// Get positional arguments (onion addresses)
 	cfg.Targets = args
 
@@ -237,18 +268,15 @@ func buildConfig(cmd *cobra.Command, args []string) (*config.Config, error) {
 }
 
 // setupLogger creates a structured logger based on verbosity setting.
+// The logger automatically sanitizes sensitive information (cookies, tokens,
+// secrets) to prevent accidental exposure in logs.
+//
+// Design decision: We use SecureLogger instead of standard slog because:
+//  1. Even in verbose mode, we must not expose secrets
+//  2. Users may share logs for debugging without realizing they contain secrets
+//  3. It's compatible with tornago's slog-based logging
 func setupLogger(verbose bool) *slog.Logger {
-	level := slog.LevelWarn
-	if verbose {
-		level = slog.LevelDebug
-	}
-
-	opts := &slog.HandlerOptions{
-		Level: level,
-	}
-
-	handler := slog.NewTextHandler(os.Stderr, opts)
-	return slog.New(handler)
+	return securelog.NewSecureLogger(os.Stderr, verbose)
 }
 
 // runScan executes the scan.
@@ -498,6 +526,11 @@ func createPipelineForTarget(client *tor.Client, logger *slog.Logger, cfg *confi
 	configOpts := []pipeline.DefaultPipelineOption{
 		pipeline.WithPipelineCrawlDepth(crawlDepth),
 		pipeline.WithPipelineCrawlMaxPages(maxPages),
+		// Politeness settings - these are important for being respectful
+		// of hidden services and avoiding rate limiting or service disruption.
+		pipeline.WithPipelineCrawlDelay(cfg.CrawlDelay),
+		pipeline.WithPipelineUserAgent(cfg.UserAgent),
+		pipeline.WithPipelineMaxBodySize(cfg.MaxBodySize),
 	}
 
 	// Add cookie if configured

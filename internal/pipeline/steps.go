@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nao1215/onionscan/internal/config"
 	"github.com/nao1215/onionscan/internal/crawler"
 	"github.com/nao1215/onionscan/internal/deanon"
 	"github.com/nao1215/onionscan/internal/model"
@@ -55,7 +56,7 @@ func WithHTTPLogger(logger *slog.Logger) HTTPScanStepOption {
 func NewHTTPScanStep(client *http.Client, opts ...HTTPScanStepOption) *HTTPScanStep {
 	s := &HTTPScanStep{
 		client:      client,
-		maxBodySize: 5 * 1024 * 1024, // 5MB default
+		maxBodySize: config.DefaultMaxBodySize,
 		logger:      slog.Default(),
 	}
 
@@ -163,6 +164,14 @@ type CrawlStep struct {
 	// delay between requests for politeness.
 	delay time.Duration
 
+	// userAgent is the User-Agent header to send with requests.
+	// A descriptive User-Agent helps service operators identify scanner traffic.
+	userAgent string
+
+	// maxBodySize limits the size of response bodies to read.
+	// This prevents memory exhaustion from unexpectedly large responses.
+	maxBodySize int64
+
 	// ignorePatterns are URL path patterns to skip during crawling.
 	ignorePatterns []string
 
@@ -218,15 +227,38 @@ func WithCrawlFollowPatterns(patterns []string) CrawlStepOption {
 	}
 }
 
+// WithCrawlUserAgent sets the User-Agent header for HTTP requests.
+// A descriptive User-Agent helps service operators identify scanner traffic.
+func WithCrawlUserAgent(userAgent string) CrawlStepOption {
+	return func(s *CrawlStep) {
+		s.userAgent = userAgent
+	}
+}
+
+// WithCrawlMaxBodySize sets the maximum response body size in bytes.
+// Responses larger than this are truncated to prevent memory exhaustion.
+func WithCrawlMaxBodySize(maxBodySize int64) CrawlStepOption {
+	return func(s *CrawlStep) {
+		s.maxBodySize = maxBodySize
+	}
+}
+
 // NewCrawlStep creates a new crawling step.
 // The client must be pre-configured with Tor SOCKS5 proxy.
+//
+// Default politeness settings are conservative to be respectful of hidden services:
+//   - delay: 1 second between requests (config.DefaultCrawlDelay)
+//   - userAgent: identifies OnionScan (config.DefaultUserAgent)
+//   - maxBodySize: 5MB to prevent memory exhaustion (config.DefaultMaxBodySize)
 func NewCrawlStep(client *http.Client, opts ...CrawlStepOption) *CrawlStep {
 	s := &CrawlStep{
-		client:   client,
-		maxDepth: 5,
-		maxPages: 100,
-		delay:    1 * time.Second,
-		logger:   slog.Default(),
+		client:      client,
+		maxDepth:    5,
+		maxPages:    config.DefaultMaxPages,
+		delay:       config.DefaultCrawlDelay,
+		userAgent:   config.DefaultUserAgent,
+		maxBodySize: config.DefaultMaxBodySize,
+		logger:      slog.Default(),
 	}
 
 	for _, opt := range opts {
@@ -249,11 +281,13 @@ func (s *CrawlStep) Do(ctx context.Context, report *model.OnionScanReport) error
 		return nil
 	}
 
-	// Build spider options
+	// Build spider options including politeness settings
 	spiderOpts := []crawler.SpiderOption{
 		crawler.WithMaxDepth(s.maxDepth),
 		crawler.WithMaxPages(s.maxPages),
 		crawler.WithDelay(s.delay),
+		crawler.WithSpiderUserAgent(s.userAgent),
+		crawler.WithSpiderMaxBodySize(s.maxBodySize),
 	}
 
 	// Add pattern filtering if configured
@@ -545,6 +579,18 @@ type DefaultPipelineConfig struct {
 
 	// FollowPatterns are URL path patterns to follow during crawling.
 	FollowPatterns []string
+
+	// CrawlDelay is the delay between HTTP requests during crawling.
+	// This is a "politeness" setting to avoid overwhelming hidden services.
+	CrawlDelay time.Duration
+
+	// UserAgent is the User-Agent header sent with HTTP requests.
+	// A descriptive User-Agent helps service operators identify scanner traffic.
+	UserAgent string
+
+	// MaxBodySize is the maximum response body size in bytes to read.
+	// Responses larger than this are truncated to prevent memory exhaustion.
+	MaxBodySize int64
 }
 
 // DefaultPipelineOption configures a DefaultPipelineConfig.
@@ -592,6 +638,31 @@ func WithPipelineFollowPatterns(patterns []string) DefaultPipelineOption {
 	}
 }
 
+// WithPipelineCrawlDelay sets the delay between HTTP requests during crawling.
+// This is a "politeness" setting to avoid overwhelming hidden services.
+// A minimum of 500ms is recommended; 1s is the default for respectful scanning.
+func WithPipelineCrawlDelay(delay time.Duration) DefaultPipelineOption {
+	return func(c *DefaultPipelineConfig) {
+		c.CrawlDelay = delay
+	}
+}
+
+// WithPipelineUserAgent sets the User-Agent header for HTTP requests.
+// A descriptive User-Agent helps service operators identify scanner traffic.
+func WithPipelineUserAgent(userAgent string) DefaultPipelineOption {
+	return func(c *DefaultPipelineConfig) {
+		c.UserAgent = userAgent
+	}
+}
+
+// WithPipelineMaxBodySize sets the maximum response body size in bytes.
+// Responses larger than this are truncated to prevent memory exhaustion.
+func WithPipelineMaxBodySize(maxBodySize int64) DefaultPipelineOption {
+	return func(c *DefaultPipelineConfig) {
+		c.MaxBodySize = maxBodySize
+	}
+}
+
 // DefaultPipeline creates a pipeline with all default steps configured.
 // This is the standard pipeline for comprehensive onion service scanning.
 //
@@ -602,13 +673,19 @@ func WithPipelineFollowPatterns(patterns []string) DefaultPipelineOption {
 //
 // The first variadic parameter accepts pipeline options (WithLogger, etc).
 // The second accepts pipeline config options (WithPipelineCrawlDepth, etc).
+//
+// Politeness settings (CrawlDelay, UserAgent, MaxBodySize) are important for
+// being respectful of hidden services. See CLAUDE.md for recommended values.
 func DefaultPipeline(client *tor.Client, pipelineOpts []Option, configOpts ...DefaultPipelineOption) *Pipeline {
 	p := New(pipelineOpts...)
 
-	// Apply default config
+	// Apply default config with conservative politeness settings
 	cfg := &DefaultPipelineConfig{
 		CrawlDepth:    5,
-		CrawlMaxPages: 100,
+		CrawlMaxPages: config.DefaultMaxPages,
+		CrawlDelay:    config.DefaultCrawlDelay,
+		UserAgent:     config.DefaultUserAgent,
+		MaxBodySize:   config.DefaultMaxBodySize,
 	}
 	for _, opt := range configOpts {
 		opt(cfg)
@@ -620,10 +697,13 @@ func DefaultPipeline(client *tor.Client, pipelineOpts []Option, configOpts ...De
 		httpClient = client.HTTPClientWithConfig(cfg.Cookie, cfg.Headers)
 	}
 
-	// Build crawl step options
+	// Build crawl step options including politeness settings
 	crawlOpts := []CrawlStepOption{
 		WithCrawlMaxDepth(cfg.CrawlDepth),
 		WithCrawlMaxPages(cfg.CrawlMaxPages),
+		WithCrawlDelay(cfg.CrawlDelay),
+		WithCrawlUserAgent(cfg.UserAgent),
+		WithCrawlMaxBodySize(cfg.MaxBodySize),
 	}
 
 	// Add pattern filtering options if configured
@@ -634,9 +714,14 @@ func DefaultPipeline(client *tor.Client, pipelineOpts []Option, configOpts ...De
 		crawlOpts = append(crawlOpts, WithCrawlFollowPatterns(cfg.FollowPatterns))
 	}
 
+	// Build HTTP scan step options
+	httpOpts := []HTTPScanStepOption{
+		WithHTTPMaxBodySize(cfg.MaxBodySize),
+	}
+
 	// Add steps in logical order
 	p.AddSteps(
-		NewHTTPScanStep(httpClient),
+		NewHTTPScanStep(httpClient, httpOpts...),
 		NewProtocolScanStep(client),
 		NewCrawlStep(httpClient, crawlOpts...),
 		NewDeanonStep(

@@ -186,9 +186,48 @@ onionscan scan --batch 5 site1.onion site2.onion site3.onion
 | `--markdown` | `-m` | `false` | Output Markdown report |
 | `--output` | `-o` | (stdout) | Write report to file |
 | `--verbose` | `-v` | `false` | Enable verbose logging |
+| `--crawl-delay` | `-D` | `1s` | Delay between HTTP requests (politeness setting) |
+| `--user-agent` | `-A` | `OnionScan/2.0` | User-Agent header for HTTP requests |
+| `--max-body-size` | `-B` | `5MB` | Maximum response body size in bytes |
 
 > [!NOTE]
 > **Batch Mode Limitation**: When using `--batch` with a value greater than 1, site-specific configurations (cookies, headers, depth) are ignored. Use `--batch 1` to apply per-site settings from your configuration file.
+
+### Politeness Settings
+
+OnionScan includes "politeness" settings to avoid overwhelming hidden services:
+
+```bash
+# Slower, more polite scanning (2 second delay)
+onionscan scan --crawl-delay 2s exampleonion.onion
+
+# Faster scanning for authorized testing (500ms delay)
+onionscan scan --crawl-delay 500ms exampleonion.onion
+
+# Custom User-Agent
+onionscan scan --user-agent "MyScanner/1.0" exampleonion.onion
+
+# Limit response body size (useful for memory-constrained environments)
+onionscan scan --max-body-size 1048576 exampleonion.onion  # 1MB
+```
+
+> [!TIP]
+> **Be Respectful**: The default settings (1s delay, 5MB body limit) are conservative. Only reduce the delay for services you control or have explicit authorization to test aggressively.
+
+### Secure Logging
+
+OnionScan automatically sanitizes sensitive information in log output, even in verbose mode:
+
+- **Sanitized**: Cookies, Authorization headers, API tokens, passwords, session IDs, private keys
+- **Safe to share**: Logs can be shared for debugging without accidentally exposing secrets
+
+```bash
+# Verbose mode with automatic secret sanitization
+onionscan scan -v exampleonion.onion
+
+# Example output (secrets are masked):
+# INFO request sent cookie=***REDACTED*** url=http://example.onion
+```
 
 ### Data Storage
 

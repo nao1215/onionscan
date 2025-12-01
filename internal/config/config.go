@@ -40,6 +40,22 @@ const (
 	// AppName is the application name used for XDG directory paths.
 	AppName = "onionscan"
 
+	// DefaultCrawlDelay is the delay between requests during crawling.
+	// This is a politeness setting to avoid overwhelming hidden services.
+	// 1 second is conservative and respectful of server resources.
+	// Can be adjusted via --crawl-delay CLI flag.
+	DefaultCrawlDelay = 1 * time.Second
+
+	// DefaultUserAgent identifies OnionScan in HTTP requests.
+	// Using a descriptive User-Agent is good practice and allows operators
+	// to identify scanner traffic in their logs.
+	DefaultUserAgent = "OnionScan/2.0 (+https://github.com/nao1215/onionscan)"
+
+	// DefaultMaxBodySize limits the maximum response body size to read.
+	// 5MB is sufficient for most HTML pages while preventing memory exhaustion
+	// from unexpectedly large responses.
+	DefaultMaxBodySize = 5 * 1024 * 1024 // 5MB
+
 	// DefaultTorStartupTimeout is the maximum time to wait for the embedded
 	// Tor daemon to bootstrap. 3 minutes is typically sufficient for most
 	// network conditions, but may need to be increased for slow connections.
@@ -135,6 +151,22 @@ type Config struct {
 	// SaveToDB indicates whether to save scan results to the database.
 	// This is automatically set to true when DBDir is configured.
 	SaveToDB bool
+
+	// CrawlDelay is the delay between HTTP requests during crawling.
+	// This is a "politeness" setting to avoid overwhelming hidden services.
+	// Lower values may cause rate limiting or service disruption.
+	// Minimum recommended: 500ms for aggressive scanning, 1s for normal use.
+	CrawlDelay time.Duration
+
+	// UserAgent is the User-Agent header sent with HTTP requests.
+	// A descriptive User-Agent helps service operators identify scanner traffic.
+	// Can be customized for stealth scanning, but consider ethical implications.
+	UserAgent string
+
+	// MaxBodySize is the maximum response body size in bytes to read.
+	// Responses larger than this are truncated to prevent memory exhaustion.
+	// Set to 0 to use the default (5MB).
+	MaxBodySize int64
 }
 
 // NewConfig creates a new Config with default values.
@@ -152,6 +184,9 @@ func NewConfig() *Config {
 		MaxPages:          DefaultMaxPages,
 		BatchSize:         DefaultBatchSize,
 		TorStartupTimeout: DefaultTorStartupTimeout,
+		CrawlDelay:        DefaultCrawlDelay,
+		UserAgent:         DefaultUserAgent,
+		MaxBodySize:       DefaultMaxBodySize,
 	}
 }
 
@@ -210,6 +245,16 @@ func (c *Config) Validate() error {
 	// JSONReport and MarkdownReport are mutually exclusive
 	if c.JSONReport && c.MarkdownReport {
 		return ErrConflictingReportFormats
+	}
+
+	// CrawlDelay must be non-negative
+	if c.CrawlDelay < 0 {
+		return ErrInvalidCrawlDelay
+	}
+
+	// MaxBodySize must be positive if set
+	if c.MaxBodySize < 0 {
+		return ErrInvalidMaxBodySize
 	}
 
 	return nil

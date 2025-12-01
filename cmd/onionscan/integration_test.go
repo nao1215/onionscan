@@ -658,16 +658,18 @@ func TestIntegrationCreatePipelineForTarget(t *testing.T) {
 }
 
 // TestIntegrationCompareCommand tests the compare command end-to-end.
+// This test does NOT require Tor because it only tests database comparison
+// functionality with mock reports. It uses a synthetic onion address.
 func TestIntegrationCompareCommand(t *testing.T) {
-	skipIfShort(t)
-	skipIfNoTor(t)
+	// Note: We don't call skipIfShort or skipIfNoTor because this test
+	// doesn't require real Tor connectivity - it only tests database operations.
+	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Start test infrastructure
-	testServer := startTestOnionServer(ctx, t)
-	defer testServer.stop(t)
+	// Use a synthetic onion address for testing (valid v3 format)
+	testOnionAddress := "pg6mmjiyjmcrsslvykfwnntlaru7p5svn6y2ymmju6nubxndf4pscryd.onion"
 
 	// Create temp directory for database
 	tmpDir := t.TempDir()
@@ -681,7 +683,7 @@ func TestIntegrationCompareCommand(t *testing.T) {
 
 	// Create two scan reports with different findings
 	report1 := &model.OnionScanReport{
-		HiddenService: testServer.onionAddress,
+		HiddenService: testOnionAddress,
 		DateScanned:   time.Now().Add(-1 * time.Hour),
 		SimpleReport: &model.SimpleReport{
 			MediumCount: 2,
@@ -693,7 +695,7 @@ func TestIntegrationCompareCommand(t *testing.T) {
 	}
 
 	report2 := &model.OnionScanReport{
-		HiddenService: testServer.onionAddress,
+		HiddenService: testOnionAddress,
 		DateScanned:   time.Now(),
 		SimpleReport: &model.SimpleReport{
 			MediumCount: 1,
@@ -741,7 +743,7 @@ func TestIntegrationCompareCommand(t *testing.T) {
 		r.Close()
 		output := buf.String()
 
-		if !strings.Contains(output, testServer.onionAddress) {
+		if !strings.Contains(output, testOnionAddress) {
 			t.Errorf("expected output to contain onion address, got: %s", output)
 		}
 	})
@@ -759,7 +761,7 @@ func TestIntegrationCompareCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err = listScanHistory(ctx, db2, testServer.onionAddress)
+		err = listScanHistory(ctx, db2, testOnionAddress)
 
 		w.Close()
 		os.Stdout = oldStdout
@@ -791,7 +793,7 @@ func TestIntegrationCompareCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err = runComparison(ctx, db2, testServer.onionAddress, 0, "", false, false)
+		err = runComparison(ctx, db2, testOnionAddress, 0, "", false, false)
 
 		w.Close()
 		os.Stdout = oldStdout
@@ -823,7 +825,7 @@ func TestIntegrationCompareCommand(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		err = runComparison(ctx, db2, testServer.onionAddress, 0, "", false, true)
+		err = runComparison(ctx, db2, testOnionAddress, 0, "", false, true)
 
 		w.Close()
 		os.Stdout = oldStdout
