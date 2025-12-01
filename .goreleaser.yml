@@ -1,0 +1,51 @@
+project_name: onionscan
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - main: ./cmd/onionscan
+    ldflags:
+      - -s -w -X 'github.com/nao1215/onionscan/internal/config.Version=v{{ .Version }}'
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+nfpms:
+  - maintainer: Naohiro CHIKAMATSU <n.chika156@gmail.com>
+    description: OnionScan - Security auditing tool for Tor hidden services (.onion addresses)
+    homepage: https://github.com/nao1215/onionscan
+    license: MIT License
+    formats:
+      - deb
+      - rpm
+      - apk
+brews:
+  - name: onionscan
+    description: OnionScan - Security auditing tool for Tor hidden services (.onion addresses)
+    license: MIT
+    repository:
+      owner: nao1215
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"

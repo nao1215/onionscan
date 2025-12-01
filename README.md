@@ -95,11 +95,19 @@ choco install tor
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install nao1215/tap/onionscan
+```
+
+### Go Install
+
 ```bash
 go install github.com/nao1215/onionscan/cmd/onionscan@latest
 ```
 
-Or build from source:
+### Build from Source
 
 ```bash
 git clone https://github.com/nao1215/onionscan.git
