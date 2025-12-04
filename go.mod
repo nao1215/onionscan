@@ -7,7 +7,7 @@ require (
 	github.com/dsoprea/go-exif/v3 v3.0.1
 	github.com/nao1215/markdown v0.10.0
 	github.com/nao1215/tornago v0.4.0
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.45.0
 	golang.org/x/net v0.47.0
 	golang.org/x/sync v0.18.0
