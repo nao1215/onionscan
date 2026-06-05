@@ -8,7 +8,7 @@ require (
 	github.com/nao1215/markdown v0.13.0
 	github.com/nao1215/tornago v0.4.0
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/net v0.55.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/text v0.37.0
