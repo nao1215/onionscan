@@ -34,4 +34,4 @@ jobs:
       - name: Run integration tests with coverage
         run: go test -cover -coverpkg=./... -coverprofile=coverage.out ./...
 
-      - uses: k1LoW/octocov-action@v1
+      - uses: k1LoW/octocov-action@v1.5.1
