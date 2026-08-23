@@ -216,17 +216,18 @@ func (c *Client) CheckConnection(ctx context.Context) ProxyStatus {
 	// We send a connection request to a test .onion address
 	// The proxy should respond (even with failure for non-existent address)
 	// This verifies it's actually proxying, not just accepting SOCKS5 handshakes
-	testOnion := socks5TestOnion
+	const testOnion = socks5TestOnion
 	testPort := uint16(80)
 
 	// Build CONNECT request: version + cmd + reserved + addr type + addr + port
-	connectReq := []byte{
+	connectReq := make([]byte, 0, 5+len(testOnion)+2)
+	connectReq = append(connectReq,
 		socks5Version,
 		socks5CmdConnect,
 		0x00, // reserved
 		socks5AddrTypeDomID,
 		byte(len(testOnion)),
-	}
+	)
 	connectReq = append(connectReq, []byte(testOnion)...)
 	connectReq = append(connectReq, byte(testPort>>8), byte(testPort&0xFF))
 

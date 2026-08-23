@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/nao1215/onionscan/internal/model"
 	"github.com/nao1215/onionscan/internal/protocol"
 	"github.com/nao1215/onionscan/internal/tor"
+	"golang.org/x/net/proxy"
 )
 
 // HTTPScanStep performs HTTP protocol scanning on the target service.
@@ -418,8 +420,9 @@ func (s *DeanonStep) Do(ctx context.Context, report *model.OnionScanReport) erro
 // 2. Results feed into technical fingerprinting
 // 3. Can be selectively enabled/disabled
 type ProtocolScanStep struct {
-	// client is the Tor client for creating connections.
-	client *tor.Client
+	// dialer establishes protocol connections. It defaults to the Tor client's
+	// dialer and can be replaced in tests or by alternative proxy setups.
+	dialer proxy.Dialer
 
 	// protocols lists which protocols to scan.
 	protocols []string
@@ -427,6 +430,16 @@ type ProtocolScanStep struct {
 	// logger for structured logging.
 	logger *slog.Logger
 }
+
+const (
+	scanProtocolSSH        = "ssh"
+	scanProtocolFTP        = "ftp"
+	scanProtocolSMTP       = "smtp"
+	scanProtocolMongoDB    = "mongodb"
+	scanProtocolRedis      = "redis"
+	scanProtocolPostgreSQL = "postgresql"
+	scanProtocolMySQL      = "mysql"
+)
 
 // ProtocolScanStepOption configures a ProtocolScanStep.
 type ProtocolScanStepOption func(*ProtocolScanStep)
@@ -446,15 +459,24 @@ func WithProtocolLogger(logger *slog.Logger) ProtocolScanStepOption {
 	}
 }
 
+// WithProtocolDialer sets the dialer used by all non-HTTP protocol scanners.
+func WithProtocolDialer(dialer proxy.Dialer) ProtocolScanStepOption {
+	return func(s *ProtocolScanStep) {
+		s.dialer = dialer
+	}
+}
+
 // NewProtocolScanStep creates a new protocol scanning step.
 func NewProtocolScanStep(client *tor.Client, opts ...ProtocolScanStepOption) *ProtocolScanStep {
 	s := &ProtocolScanStep{
-		client: client,
 		protocols: []string{
-			"ssh", "ftp", "smtp",
-			"mongodb", "redis", "postgresql", "mysql",
+			scanProtocolSSH, scanProtocolFTP, scanProtocolSMTP,
+			scanProtocolMongoDB, scanProtocolRedis, scanProtocolPostgreSQL, scanProtocolMySQL,
 		},
 		logger: slog.Default(),
+	}
+	if client != nil {
+		s.dialer = client.Dialer()
 	}
 
 	for _, opt := range opts {
@@ -478,16 +500,19 @@ func (s *ProtocolScanStep) Do(ctx context.Context, report *model.OnionScanReport
 	}
 
 	// Create scanners for each protocol
-	conn := s.client.Dialer()
+	if s.dialer == nil {
+		return errors.New("protocol scan requires a dialer")
+	}
+	conn := s.dialer
 
 	scanners := map[string]protocolInfo{
-		"ssh":        {22, protocol.NewSSHScanner(conn)},
-		"ftp":        {21, protocol.NewFTPScanner(conn)},
-		"smtp":       {25, protocol.NewSMTPScanner(conn)},
-		"mongodb":    {27017, protocol.NewMongoDBScanner(conn)},
-		"redis":      {6379, protocol.NewRedisScanner(conn)},
-		"postgresql": {5432, protocol.NewPostgreSQLScanner(conn)},
-		"mysql":      {3306, protocol.NewMySQLScanner(conn)},
+		scanProtocolSSH:        {22, protocol.NewSSHScanner(conn)},
+		scanProtocolFTP:        {21, protocol.NewFTPScanner(conn)},
+		scanProtocolSMTP:       {25, protocol.NewSMTPScanner(conn)},
+		scanProtocolMongoDB:    {27017, protocol.NewMongoDBScanner(conn)},
+		scanProtocolRedis:      {6379, protocol.NewRedisScanner(conn)},
+		scanProtocolPostgreSQL: {5432, protocol.NewPostgreSQLScanner(conn)},
+		scanProtocolMySQL:      {3306, protocol.NewMySQLScanner(conn)},
 	}
 
 	// Scan each protocol
@@ -523,22 +548,22 @@ func (s *ProtocolScanStep) Do(ctx context.Context, report *model.OnionScanReport
 
 			// Store protocol results
 			switch proto {
-			case "ssh":
+			case scanProtocolSSH:
 				report.SSHDetected = true
 				report.SSHBanner = result.Banner
-			case "ftp":
+			case scanProtocolFTP:
 				report.FTPDetected = true
 				report.FTPBanner = result.Banner
-			case "smtp":
+			case scanProtocolSMTP:
 				report.SMTPDetected = true
 				report.SMTPBanner = result.Banner
-			case "mongodb":
+			case scanProtocolMongoDB:
 				report.MongoDBDetected = true
-			case "redis":
+			case scanProtocolRedis:
 				report.RedisDetected = true
-			case "postgresql":
+			case scanProtocolPostgreSQL:
 				report.PostgreSQLDetected = true
-			case "mysql":
+			case scanProtocolMySQL:
 				report.MySQLDetected = true
 			}
 

@@ -8,6 +8,16 @@ import (
 	"github.com/nao1215/onionscan/internal/model"
 )
 
+const (
+	cloudCategoryAWS        = "aws"
+	cloudCategoryGCP        = "gcp"
+	cloudCategoryAzure      = "azure"
+	cloudCategoryCloudflare = "cloudflare"
+	cloudCategoryCDN        = "cdn"
+	cloudCategoryOther      = "other"
+	cloudHeaderValueLimit   = 50
+)
+
 // CloudAnalyzer detects references to cloud services that could
 // reveal the infrastructure behind a hidden service.
 //
@@ -40,49 +50,49 @@ func NewCloudAnalyzer() *CloudAnalyzer {
 				description: "AWS S3 bucket URL detected. May reveal AWS account or region.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?(?:([a-z0-9][a-z0-9.-]+)\.s3[.-](?:([a-z0-9-]+)\.)?amazonaws\.com|s3[.-](?:([a-z0-9-]+)\.)?amazonaws\.com/([a-z0-9][a-z0-9.-]+))`),
-				category:    "aws",
+				category:    cloudCategoryAWS,
 			},
 			{
 				name:        "aws_cloudfront",
 				description: "AWS CloudFront distribution detected. May reveal AWS account.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9]+\.cloudfront\.net`),
-				category:    "aws",
+				category:    cloudCategoryAWS,
 			},
 			{
 				name:        "aws_api_gateway",
 				description: "AWS API Gateway endpoint detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9]+\.execute-api\.[a-z0-9-]+\.amazonaws\.com`),
-				category:    "aws",
+				category:    cloudCategoryAWS,
 			},
 			{
 				name:        "aws_lambda",
 				description: "AWS Lambda function URL detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9]+\.lambda-url\.[a-z0-9-]+\.on\.aws`),
-				category:    "aws",
+				category:    cloudCategoryAWS,
 			},
 			{
 				name:        "aws_ec2",
 				description: "AWS EC2 instance identifier or endpoint detected.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)ec2-[0-9-]+\.[a-z0-9-]+\.compute\.amazonaws\.com|i-[a-f0-9]{8,17}`),
-				category:    "aws",
+				category:    cloudCategoryAWS,
 			},
 			{
 				name:        "aws_elb",
 				description: "AWS Elastic Load Balancer detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.[a-z0-9-]+\.elb\.amazonaws\.com`),
-				category:    "aws",
+				category:    cloudCategoryAWS,
 			},
 			{
 				name:        "aws_cognito",
 				description: "AWS Cognito endpoint detected. May contain user pool ID.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)cognito-idp\.[a-z0-9-]+\.amazonaws\.com|[a-z0-9-]+\.auth\.[a-z0-9-]+\.amazoncognito\.com`),
-				category:    "aws",
+				category:    cloudCategoryAWS,
 			},
 
 			// Google Cloud Platform
@@ -91,35 +101,35 @@ func NewCloudAnalyzer() *CloudAnalyzer {
 				description: "Google Cloud Storage bucket detected.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?storage\.googleapis\.com/[a-z0-9][a-z0-9._-]+|(?:https?://)?[a-z0-9][a-z0-9._-]+\.storage\.googleapis\.com`),
-				category:    "gcp",
+				category:    cloudCategoryGCP,
 			},
 			{
 				name:        "gcp_firebase",
 				description: "Firebase hosting or database detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.firebaseapp\.com|(?:https?://)?[a-z0-9-]+\.firebaseio\.com|(?:https?://)?[a-z0-9-]+\.web\.app`),
-				category:    "gcp",
+				category:    cloudCategoryGCP,
 			},
 			{
 				name:        "gcp_cloud_run",
 				description: "Google Cloud Run service detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+-[a-z0-9]+\.run\.app`),
-				category:    "gcp",
+				category:    cloudCategoryGCP,
 			},
 			{
 				name:        "gcp_cloud_functions",
 				description: "Google Cloud Functions endpoint detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+-[a-z0-9]+\.cloudfunctions\.net`),
-				category:    "gcp",
+				category:    cloudCategoryGCP,
 			},
 			{
 				name:        "gcp_appengine",
 				description: "Google App Engine application detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.appspot\.com`),
-				category:    "gcp",
+				category:    cloudCategoryGCP,
 			},
 
 			// Microsoft Azure
@@ -128,28 +138,28 @@ func NewCloudAnalyzer() *CloudAnalyzer {
 				description: "Azure Blob Storage detected.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9]+\.blob\.core\.windows\.net`),
-				category:    "azure",
+				category:    cloudCategoryAzure,
 			},
 			{
 				name:        "azure_websites",
 				description: "Azure Web Apps detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.azurewebsites\.net`),
-				category:    "azure",
+				category:    cloudCategoryAzure,
 			},
 			{
 				name:        "azure_functions",
 				description: "Azure Functions endpoint detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.azurestaticapps\.net`),
-				category:    "azure",
+				category:    cloudCategoryAzure,
 			},
 			{
 				name:        "azure_cdn",
 				description: "Azure CDN endpoint detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.azureedge\.net`),
-				category:    "azure",
+				category:    cloudCategoryAzure,
 			},
 
 			// Cloudflare
@@ -158,21 +168,21 @@ func NewCloudAnalyzer() *CloudAnalyzer {
 				description: "Cloudflare Workers detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.workers\.dev`),
-				category:    "cloudflare",
+				category:    cloudCategoryCloudflare,
 			},
 			{
 				name:        "cloudflare_pages",
 				description: "Cloudflare Pages detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.pages\.dev`),
-				category:    "cloudflare",
+				category:    cloudCategoryCloudflare,
 			},
 			{
 				name:        "cloudflare_r2",
 				description: "Cloudflare R2 storage detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.r2\.dev`),
-				category:    "cloudflare",
+				category:    cloudCategoryCloudflare,
 			},
 
 			// Other CDNs
@@ -181,21 +191,21 @@ func NewCloudAnalyzer() *CloudAnalyzer {
 				description: "Fastly CDN detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.fastly\.net|(?:https?://)?[a-z0-9-]+\.fastlylb\.net`),
-				category:    "cdn",
+				category:    cloudCategoryCDN,
 			},
 			{
 				name:        "akamai_cdn",
 				description: "Akamai CDN detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.akamaized\.net|(?:https?://)?[a-z0-9-]+\.akamaihd\.net`),
-				category:    "cdn",
+				category:    cloudCategoryCDN,
 			},
 			{
 				name:        "bunny_cdn",
 				description: "Bunny CDN detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.b-cdn\.net`),
-				category:    "cdn",
+				category:    cloudCategoryCDN,
 			},
 
 			// Other cloud services
@@ -204,56 +214,56 @@ func NewCloudAnalyzer() *CloudAnalyzer {
 				description: "DigitalOcean Spaces detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.[a-z0-9]+\.digitaloceanspaces\.com`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 			{
 				name:        "digitalocean_app",
 				description: "DigitalOcean App Platform detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.ondigitalocean\.app`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 			{
 				name:        "heroku",
 				description: "Heroku application detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.herokuapp\.com`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 			{
 				name:        "vercel",
 				description: "Vercel deployment detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.vercel\.app`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 			{
 				name:        "netlify",
 				description: "Netlify deployment detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.netlify\.app|(?:https?://)?[a-z0-9-]+\.netlify\.com`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 			{
 				name:        "render",
 				description: "Render deployment detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.onrender\.com`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 			{
 				name:        "railway",
 				description: "Railway deployment detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.up\.railway\.app`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 			{
 				name:        "fly_io",
 				description: "Fly.io deployment detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:https?://)?[a-z0-9-]+\.fly\.dev`),
-				category:    "other",
+				category:    cloudCategoryOther,
 			},
 		},
 	}
@@ -361,7 +371,7 @@ func (a *CloudAnalyzer) checkHeaders(headers map[string][]string, location strin
 				Description:  "AWS-specific header found. Service is likely hosted on AWS.",
 				Severity:     model.SeverityMedium,
 				SeverityText: model.SeverityMedium.String(),
-				Value:        headerName + ": " + a.truncateValue(headerValue, 50),
+				Value:        headerName + ": " + a.truncateValue(headerValue),
 				Location:     location,
 			})
 		}
@@ -374,7 +384,7 @@ func (a *CloudAnalyzer) checkHeaders(headers map[string][]string, location strin
 				Description:  "Azure-specific header found. Service is likely hosted on Azure.",
 				Severity:     model.SeverityMedium,
 				SeverityText: model.SeverityMedium.String(),
-				Value:        headerName + ": " + a.truncateValue(headerValue, 50),
+				Value:        headerName + ": " + a.truncateValue(headerValue),
 				Location:     location,
 			})
 		}
@@ -387,7 +397,7 @@ func (a *CloudAnalyzer) checkHeaders(headers map[string][]string, location strin
 				Description:  "GCP-specific header found. Service is likely hosted on Google Cloud.",
 				Severity:     model.SeverityMedium,
 				SeverityText: model.SeverityMedium.String(),
-				Value:        headerName + ": " + a.truncateValue(headerValue, 50),
+				Value:        headerName + ": " + a.truncateValue(headerValue),
 				Location:     location,
 			})
 		}
@@ -423,10 +433,10 @@ func (a *CloudAnalyzer) checkHeaders(headers map[string][]string, location strin
 	return findings
 }
 
-// truncateValue truncates a value to the specified length.
-func (a *CloudAnalyzer) truncateValue(value string, maxLen int) string {
-	if len(value) > maxLen {
-		return value[:maxLen] + "..."
+// truncateValue truncates a value to the maximum reported header length.
+func (a *CloudAnalyzer) truncateValue(value string) string {
+	if len(value) > cloudHeaderValueLimit {
+		return value[:cloudHeaderValueLimit] + "..."
 	}
 	return value
 }

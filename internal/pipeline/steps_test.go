@@ -2,7 +2,14 @@ package pipeline
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"errors"
+	"io"
 	"log/slog"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +17,20 @@ import (
 	"time"
 
 	"github.com/nao1215/onionscan/internal/model"
+	"github.com/nao1215/onionscan/internal/tor"
 )
+
+type pipelineDialerFunc func(network, address string) (net.Conn, error)
+
+func (f pipelineDialerFunc) Dial(network, address string) (net.Conn, error) {
+	return f(network, address)
+}
+
+type pipelineRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f pipelineRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 // TestNewHTTPScanStep tests the HTTPScanStep constructor.
 func TestNewHTTPScanStep(t *testing.T) {
@@ -260,6 +280,19 @@ func TestNewProtocolScanStep(t *testing.T) {
 		}
 	})
 
+	t.Run("applies WithProtocolDialer", func(t *testing.T) {
+		t.Parallel()
+
+		dialer := pipelineDialerFunc(func(_, _ string) (net.Conn, error) {
+			return nil, errors.New("not implemented")
+		})
+		step := NewProtocolScanStep(nil, WithProtocolDialer(dialer))
+
+		if step.dialer == nil {
+			t.Fatal("expected custom dialer")
+		}
+	})
+
 	t.Run("Name returns correct value", func(t *testing.T) {
 		t.Parallel()
 
@@ -452,6 +485,52 @@ func TestHTTPScanStepDo(t *testing.T) {
 			t.Errorf("expected X-Powered-By 'Express', got %q", report.AnonymityReport.XPoweredBy)
 		}
 	})
+
+	t.Run("records HTTP findings and HTTPS certificate", func(t *testing.T) {
+		certificate := &x509.Certificate{
+			Subject:      pkix.Name{CommonName: "test.onion"},
+			Issuer:       pkix.Name{CommonName: "Test CA"},
+			SerialNumber: big.NewInt(42),
+			NotBefore:    time.Unix(1, 0).UTC(),
+			NotAfter:     time.Unix(2, 0).UTC(),
+			DNSNames:     []string{"test.onion"},
+		}
+		client := &http.Client{Transport: pipelineRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			headers := http.Header{
+				"Server":       []string{"nginx/1.18.0"},
+				"X-Powered-By": []string{"PHP/7.4"},
+				"X-Real-Ip":    []string{"192.0.2.1"},
+			}
+			response := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     headers,
+				Body:       io.NopCloser(strings.NewReader("<html>test</html>")),
+				Request:    req,
+			}
+			if req.URL.Scheme == "https" {
+				response.TLS = &tls.ConnectionState{
+					Version:          tls.VersionTLS12,
+					PeerCertificates: []*x509.Certificate{certificate},
+				}
+			}
+			return response, nil
+		})}
+		step := NewHTTPScanStep(client)
+		report := model.NewOnionScanReport("test.onion")
+
+		if err := step.Do(context.Background(), report); err != nil {
+			t.Fatalf("HTTP scan failed: %v", err)
+		}
+		if !report.WebDetected || !report.TLSDetected || report.TLSCertificate == nil {
+			t.Fatalf("expected HTTP and TLS detection: %+v", report)
+		}
+		if report.AnonymityReport.ServerVersion != "nginx/1.18.0" || report.AnonymityReport.XPoweredBy != "PHP/7.4" {
+			t.Fatalf("unexpected headers: %+v", report.AnonymityReport)
+		}
+		if report.SimpleReport == nil || len(report.SimpleReport.Findings) == 0 {
+			t.Fatal("expected HTTP findings")
+		}
+	})
 }
 
 // TestCrawlStepDo tests the CrawlStep.Do method.
@@ -497,6 +576,26 @@ func TestCrawlStepDo(t *testing.T) {
 
 		if len(report.CrawledPages) == 0 {
 			t.Error("expected crawled pages")
+		}
+	})
+
+	t.Run("keeps partial state after request failure", func(t *testing.T) {
+		client := &http.Client{Transport: pipelineRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("request failed")
+		})}
+		step := NewCrawlStep(client,
+			WithCrawlIgnorePatterns([]string{"/private"}),
+			WithCrawlFollowPatterns([]string{"/public"}),
+			WithCrawlDelay(0),
+		)
+		report := model.NewOnionScanReport("test.onion")
+		report.WebDetected = true
+
+		if err := step.Do(context.Background(), report); err != nil {
+			t.Fatalf("crawl step returned a fatal error: %v", err)
+		}
+		if len(report.CrawledPages) != 0 {
+			t.Fatalf("expected no pages, got %d", len(report.CrawledPages))
 		}
 	})
 }
@@ -563,4 +662,127 @@ func TestDeanonStepDo(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("keeps partial findings when context is cancelled", func(t *testing.T) {
+		step := NewDeanonStep()
+		report := model.NewOnionScanReport("test.onion")
+		report.CrawledPages = []*model.Page{{URL: "http://test.onion/", Snapshot: "admin@example.com"}}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		if err := step.Do(ctx, report); err != nil {
+			t.Fatalf("deanon step returned a fatal error: %v", err)
+		}
+	})
+}
+
+func TestProtocolScanStepDo(t *testing.T) {
+	t.Parallel()
+
+	newConnection := func(address string) net.Conn {
+		client, server := net.Pipe()
+		go func() {
+			defer server.Close()
+
+			switch {
+			case strings.HasSuffix(address, ":22"):
+				_, _ = io.WriteString(server, "SSH-2.0-OpenSSH_6.6 Ubuntu\r\n")
+			case strings.HasSuffix(address, ":21"):
+				_, _ = io.WriteString(server, "220 vsFTPd server.example.com\r\n")
+			case strings.HasSuffix(address, ":25"):
+				_, _ = io.WriteString(server, "220 mail.example.com ESMTP Postfix\r\n")
+			case strings.HasSuffix(address, ":6379"):
+				request := make([]byte, len("PING\r\n"))
+				_, _ = io.ReadFull(server, request)
+				_, _ = io.WriteString(server, "+PONG\r\n")
+			case strings.HasSuffix(address, ":3306"):
+				greeting := append([]byte{0x10, 0x00, 0x00, 0x00, 0x0a}, []byte("8.4.0")...)
+				_, _ = server.Write(append(greeting, 0))
+			}
+		}()
+		return client
+	}
+
+	dialer := pipelineDialerFunc(func(_, address string) (net.Conn, error) {
+		return newConnection(address), nil
+	})
+	step := NewProtocolScanStep(nil,
+		WithProtocolDialer(dialer),
+		WithProtocols([]string{"ssh", "ftp", "smtp", "mongodb", "redis", "postgresql", "mysql", "unknown"}),
+	)
+	report := model.NewOnionScanReport("test.onion")
+
+	if err := step.Do(context.Background(), report); err != nil {
+		t.Fatalf("protocol scan failed: %v", err)
+	}
+	if !report.SSHDetected || !report.FTPDetected || !report.SMTPDetected ||
+		!report.MongoDBDetected || !report.RedisDetected ||
+		!report.PostgreSQLDetected || !report.MySQLDetected {
+		t.Fatalf("not all protocols were recorded: %+v", report)
+	}
+	if report.SSHBanner == "" || report.FTPBanner == "" || report.SMTPBanner == "" {
+		t.Fatal("expected protocol banners")
+	}
+	if report.SimpleReport == nil || len(report.SimpleReport.Findings) == 0 {
+		t.Fatal("expected protocol findings")
+	}
+
+	missingDialer := NewProtocolScanStep(nil)
+	if err := missingDialer.Do(context.Background(), model.NewOnionScanReport("test.onion")); err == nil {
+		t.Fatal("expected a missing dialer error")
+	}
+
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := step.Do(cancelled, model.NewOnionScanReport("test.onion")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+}
+
+func TestDefaultPipelineConfiguration(t *testing.T) {
+	t.Parallel()
+
+	client, err := tor.NewClient("127.0.0.1:9050", time.Second)
+	if err != nil {
+		t.Fatalf("create Tor client: %v", err)
+	}
+	logger := slog.Default()
+	p := DefaultPipeline(client, []Option{WithLogger(logger), WithContinueOnError(true)},
+		WithPipelineCrawlDepth(7),
+		WithPipelineCrawlMaxPages(11),
+		WithPipelineCookie("session=test"),
+		WithPipelineHeaders(map[string]string{"X-Test": "true"}),
+		WithPipelineIgnorePatterns([]string{"/private"}),
+		WithPipelineFollowPatterns([]string{"/public"}),
+		WithPipelineCrawlDelay(25*time.Millisecond),
+		WithPipelineUserAgent("OnionScan-Test"),
+		WithPipelineMaxBodySize(2048),
+	)
+
+	if p.StepCount() != 4 || !p.continueOnError || p.logger != logger {
+		t.Fatalf("unexpected pipeline: steps=%d continue=%v", p.StepCount(), p.continueOnError)
+	}
+	httpStep, ok := p.steps[0].(*HTTPScanStep)
+	if !ok || httpStep.maxBodySize != 2048 {
+		t.Fatalf("unexpected HTTP step: %#v", p.steps[0])
+	}
+	protocolStep, ok := p.steps[1].(*ProtocolScanStep)
+	if !ok || protocolStep.dialer == nil {
+		t.Fatalf("unexpected protocol step: %#v", p.steps[1])
+	}
+	crawlStep, ok := p.steps[2].(*CrawlStep)
+	if !ok || crawlStep.maxDepth != 7 || crawlStep.maxPages != 11 ||
+		crawlStep.delay != 25*time.Millisecond || crawlStep.userAgent != "OnionScan-Test" ||
+		crawlStep.maxBodySize != 2048 || len(crawlStep.ignorePatterns) != 1 ||
+		len(crawlStep.followPatterns) != 1 {
+		t.Fatalf("unexpected crawl step: %#v", p.steps[2])
+	}
+	if _, ok := p.steps[3].(*DeanonStep); !ok {
+		t.Fatalf("unexpected deanon step: %#v", p.steps[3])
+	}
+
+	plain := DefaultPipeline(client, nil)
+	if plain.StepCount() != 4 {
+		t.Fatalf("plain pipeline step count = %d", plain.StepCount())
+	}
 }

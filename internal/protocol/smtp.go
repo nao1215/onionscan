@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"context"
-	"net"
 	"strings"
 	"time"
 
@@ -80,7 +79,7 @@ func (s *SMTPScanner) Scan(ctx context.Context, target string) (*ScanResult, err
 	defer cancel()
 
 	// Connect to SMTP port
-	conn, err := s.dialWithContext(ctx, "tcp", host)
+	conn, err := dialProxyWithContext(ctx, s.dialer, host)
 	if err != nil {
 		return result, nil
 	}
@@ -124,28 +123,6 @@ func (s *SMTPScanner) Scan(ctx context.Context, target string) (*ScanResult, err
 	s.analyzeBanner(result)
 
 	return result, nil
-}
-
-// dialWithContext dials a connection respecting context cancellation.
-func (s *SMTPScanner) dialWithContext(ctx context.Context, network, address string) (net.Conn, error) {
-	type dialResult struct {
-		conn net.Conn
-		err  error
-	}
-
-	resultCh := make(chan dialResult, 1)
-
-	go func() {
-		conn, err := s.dialer.Dial(network, address)
-		resultCh <- dialResult{conn, err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case result := <-resultCh:
-		return result.conn, result.err
-	}
 }
 
 // analyzeBanner analyzes the SMTP banner for security information.
@@ -193,7 +170,7 @@ func (s *SMTPScanner) analyzeBanner(result *ScanResult) {
 		Severity:    model.SeverityInfo,
 		Value:       banner,
 		Location:    "SMTP Banner (Port 25)",
-		Category:    "information-disclosure",
+		Category:    categoryInformationDisclosure,
 	})
 }
 
@@ -256,7 +233,7 @@ func (s *SMTPScanner) checkBannerLeaks(result *ScanResult) {
 			Severity:    model.SeverityLow,
 			Value:       banner,
 			Location:    "SMTP Banner",
-			Category:    "information-disclosure",
+			Category:    categoryInformationDisclosure,
 		})
 	}
 }

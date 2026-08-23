@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 // TestNewInitCmd tests the init command creation.
@@ -184,6 +186,45 @@ func TestRunInitCmd(t *testing.T) {
 		perm := info.Mode().Perm()
 		if perm != 0600 {
 			t.Errorf("expected permissions 0600, got %o", perm)
+		}
+	})
+}
+
+func TestRunInitCmdErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	if err := runInitCmd(&cobra.Command{}, nil); err == nil {
+		t.Fatal("expected missing output flag error")
+	}
+
+	missingForce := &cobra.Command{}
+	missingForce.Flags().String("output", "config.yaml", "")
+	if err := runInitCmd(missingForce, nil); err == nil {
+		t.Fatal("expected missing force flag error")
+	}
+
+	t.Run("parent path is a file", func(t *testing.T) {
+		t.Parallel()
+
+		parentFile := filepath.Join(t.TempDir(), "file")
+		if err := os.WriteFile(parentFile, []byte("file"), 0o600); err != nil {
+			t.Fatalf("create parent file: %v", err)
+		}
+		cmd := NewInitCmd()
+		_ = cmd.Flags().Set("output", filepath.Join(parentFile, "config.yaml"))
+		if err := runInitCmd(cmd, nil); err == nil || !strings.Contains(err.Error(), "failed to create directory") {
+			t.Fatalf("expected directory creation error, got %v", err)
+		}
+	})
+
+	t.Run("output path is a directory", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewInitCmd()
+		_ = cmd.Flags().Set("output", t.TempDir())
+		_ = cmd.Flags().Set("force", "true")
+		if err := runInitCmd(cmd, nil); err == nil || !strings.Contains(err.Error(), "failed to write configuration file") {
+			t.Fatalf("expected write error, got %v", err)
 		}
 	})
 }

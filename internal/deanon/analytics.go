@@ -8,6 +8,14 @@ import (
 	"github.com/nao1215/onionscan/internal/model"
 )
 
+const (
+	analyticsGoogleUA      = "google_analytics_ua"
+	analyticsGoogleGA4     = "google_analytics_ga4"
+	analyticsGoogleTag     = "google_tag_manager"
+	analyticsGoogleAdSense = "google_adsense"
+	analyticsFacebookPixel = "facebook_pixel"
+)
+
 // AnalyticsAnalyzer detects tracking and analytics IDs in page content.
 // Analytics IDs are critical deanonymization vectors because they can
 // be correlated across multiple sites to identify common operators.
@@ -27,22 +35,22 @@ func NewAnalyticsAnalyzer() *AnalyticsAnalyzer {
 	return &AnalyticsAnalyzer{
 		patterns: map[string]*regexp.Regexp{
 			// Google Analytics Universal (UA-XXXXX-Y)
-			"google_analytics_ua": regexp.MustCompile(`UA-\d{4,10}-\d{1,4}`),
+			analyticsGoogleUA: regexp.MustCompile(`UA-\d{4,10}-\d{1,4}`),
 
 			// Google Analytics 4 (G-XXXXXXXXXX)
-			"google_analytics_ga4": regexp.MustCompile(`G-[A-Z0-9]{10,12}`),
+			analyticsGoogleGA4: regexp.MustCompile(`G-[A-Z0-9]{10,12}`),
 
 			// Google Tag Manager (GTM-XXXXXX)
-			"google_tag_manager": regexp.MustCompile(`GTM-[A-Z0-9]{6,8}`),
+			analyticsGoogleTag: regexp.MustCompile(`GTM-[A-Z0-9]{6,8}`),
 
 			// Google AdSense (pub-XXXXXXXXXXXXXXXX)
-			"google_adsense": regexp.MustCompile(`pub-\d{16}`),
+			analyticsGoogleAdSense: regexp.MustCompile(`pub-\d{16}`),
 
 			// Google Publisher Tag
 			"google_publisher": regexp.MustCompile(`ca-pub-\d{16}`),
 
 			// Facebook Pixel
-			"facebook_pixel": regexp.MustCompile(`fbq\s*\(\s*['"]init['"]\s*,\s*['"](\d{15,16})['"]`),
+			analyticsFacebookPixel: regexp.MustCompile(`fbq\s*\(\s*['"]init['"]\s*,\s*['"](\d{15,16})['"]`),
 
 			// Yandex Metrica
 			"yandex_metrica": regexp.MustCompile(`ym\s*\(\s*(\d{8,9})`),
@@ -132,12 +140,12 @@ func (a *AnalyticsAnalyzer) Analyze(ctx context.Context, data *AnalysisData) ([]
 // getTitle returns a human-readable title for the analytics type.
 func (a *AnalyticsAnalyzer) getTitle(analyticsType string) string {
 	titles := map[string]string{
-		"google_analytics_ua":  "Google Analytics UA ID Found",
-		"google_analytics_ga4": "Google Analytics 4 ID Found",
-		"google_tag_manager":   "Google Tag Manager ID Found",
-		"google_adsense":       "Google AdSense Publisher ID Found",
+		analyticsGoogleUA:      "Google Analytics UA ID Found",
+		analyticsGoogleGA4:     "Google Analytics 4 ID Found",
+		analyticsGoogleTag:     "Google Tag Manager ID Found",
+		analyticsGoogleAdSense: "Google AdSense Publisher ID Found",
 		"google_publisher":     "Google Publisher ID Found",
-		"facebook_pixel":       "Facebook Pixel ID Found",
+		analyticsFacebookPixel: "Facebook Pixel ID Found",
 		"yandex_metrica":       "Yandex Metrica ID Found",
 		"matomo":               "Matomo/Piwik Site ID Found",
 		"clarity":              "Microsoft Clarity ID Found",
@@ -154,15 +162,15 @@ func (a *AnalyticsAnalyzer) getTitle(analyticsType string) string {
 // getDescription returns a description for the analytics type.
 func (a *AnalyticsAnalyzer) getDescription(analyticsType string) string {
 	descriptions := map[string]string{
-		"google_analytics_ua": "A Google Analytics Universal tracking ID was found. " +
+		analyticsGoogleUA: "A Google Analytics Universal tracking ID was found. " +
 			"This ID can be searched on services like SpyOnWeb to find other sites with the same owner.",
-		"google_analytics_ga4": "A Google Analytics 4 measurement ID was found. " +
+		analyticsGoogleGA4: "A Google Analytics 4 measurement ID was found. " +
 			"This can be used to correlate this site with other properties.",
-		"google_tag_manager": "A Google Tag Manager container ID was found. " +
+		analyticsGoogleTag: "A Google Tag Manager container ID was found. " +
 			"This can be used to correlate this site with other properties managed by the same account.",
-		"google_adsense": "A Google AdSense publisher ID was found. " +
+		analyticsGoogleAdSense: "A Google AdSense publisher ID was found. " +
 			"This directly links to a Google account and can be used to find other sites.",
-		"facebook_pixel": "A Facebook Pixel ID was found. " +
+		analyticsFacebookPixel: "A Facebook Pixel ID was found. " +
 			"This links to a Facebook Business account and may reveal identity.",
 	}
 

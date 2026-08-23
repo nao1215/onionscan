@@ -261,7 +261,7 @@ func (a *PrivateKeyAnalyzer) sanitizeKeyValue(value, keyType string) string {
 
 // titleForPattern returns a human-readable title for a pattern type.
 func (a *PrivateKeyAnalyzer) titleForPattern(patternName string) string {
-	titles := map[string]string{
+	titles := map[string]string{ //nolint:gosec // Map keys identify finding types; values are display titles, not credentials.
 		"tor_v3_private_key":    "Tor v3 Hidden Service Private Key Exposed",
 		"tor_v2_private_key":    "Tor v2 Hidden Service Private Key Exposed",
 		"rsa_private_key":       "RSA Private Key Exposed",

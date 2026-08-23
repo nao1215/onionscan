@@ -94,3 +94,48 @@ scenarios:
             json:
               - { path: "$.onion_service", equals: "${onion_address}" }
               - { path: "$.risk_change.direction", equals: "unchanged" }
+
+  - name: batch scan exercises concurrent CLI execution
+    env:
+      HOME: "${workdir}/home"
+      XDG_CONFIG_HOME: "${workdir}/home/.config"
+      XDG_DATA_HOME: "${workdir}/home/.local/share"
+    steps:
+      - run:
+          command: onionscan scan --external-tor ${socks_address} --timeout 20s --batch 2 --depth 1 --max-pages 2 --crawl-delay 0s --json --output batch.json ${onion_address} ${onion_address}
+          timeout: 3m
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Starting batch scan of 2 targets"
+              - "Batch scan completed"
+      - assert:
+          file:
+            path: batch.json
+            json:
+              - { path: "$.hidden_service", equals: "${onion_address}" }
+              - { path: "$.web_detected", equals: true }
+
+  - name: embedded Tor scans the self-hosted onion service
+    env:
+      HOME: "${workdir}/home"
+      XDG_CONFIG_HOME: "${workdir}/home/.config"
+      XDG_DATA_HOME: "${workdir}/home/.local/share"
+    steps:
+      - run:
+          command: onionscan scan --tor-timeout 6m --timeout 90s --depth 1 --max-pages 2 --crawl-delay 0s --json --output embedded.json ${onion_address}
+          timeout: 8m
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Starting embedded Tor daemon"
+              - "Embedded Tor daemon started successfully"
+      - assert:
+          file:
+            path: embedded.json
+            json:
+              - { path: "$.hidden_service", equals: "${onion_address}" }
+              - { path: "$.web_detected", equals: true }
+              - { path: "$.timed_out", equals: false }

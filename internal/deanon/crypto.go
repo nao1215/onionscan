@@ -7,6 +7,21 @@ import (
 	"github.com/nao1215/onionscan/internal/model"
 )
 
+const (
+	cryptoBitcoinLegacy    = "bitcoin_legacy"
+	cryptoBitcoinBech32    = "bitcoin_bech32"
+	cryptoEthereum         = "ethereum"
+	cryptoMonero           = "monero"
+	cryptoLitecoinLegacy   = "litecoin_legacy"
+	cryptoLitecoinBech32   = "litecoin_bech32"
+	cryptoBitcoinCash      = "bitcoin_cash"
+	cryptoDash             = "dash"
+	cryptoZcashTransparent = "zcash_transparent"
+	cryptoZcashShielded    = "zcash_shielded"
+	cryptoDogecoin         = "dogecoin"
+	cryptoNameBitcoin      = "Bitcoin"
+)
+
 // CryptoAnalyzer detects cryptocurrency addresses in page content.
 // Cryptocurrency addresses are correlation vectors because blockchain
 // analysis can potentially link addresses to identities.
@@ -27,32 +42,32 @@ func NewCryptoAnalyzer() *CryptoAnalyzer {
 			// Bitcoin addresses (Legacy P2PKH, P2SH, Bech32)
 			// Legacy: 1... or 3... (25-34 chars)
 			// Bech32: bc1... (42 or 62 chars)
-			"bitcoin_legacy": regexp.MustCompile(`\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b`),
-			"bitcoin_bech32": regexp.MustCompile(`\bbc1[a-z0-9]{39,59}\b`),
+			cryptoBitcoinLegacy: regexp.MustCompile(`\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b`),
+			cryptoBitcoinBech32: regexp.MustCompile(`\bbc1[a-z0-9]{39,59}\b`),
 
 			// Ethereum addresses (0x followed by 40 hex chars)
-			"ethereum": regexp.MustCompile(`\b0x[a-fA-F0-9]{40}\b`),
+			cryptoEthereum: regexp.MustCompile(`\b0x[a-fA-F0-9]{40}\b`),
 
 			// Monero addresses (95 chars starting with 4)
 			// Subaddresses start with 8
-			"monero": regexp.MustCompile(`\b[48][0-9AB][1-9A-HJ-NP-Za-km-z]{93}\b`),
+			cryptoMonero: regexp.MustCompile(`\b[48][0-9AB][1-9A-HJ-NP-Za-km-z]{93}\b`),
 
 			// Litecoin (L, M, or 3 prefix for legacy, ltc1 for bech32)
-			"litecoin_legacy": regexp.MustCompile(`\b[LM3][a-km-zA-HJ-NP-Z1-9]{26,33}\b`),
-			"litecoin_bech32": regexp.MustCompile(`\bltc1[a-z0-9]{39,59}\b`),
+			cryptoLitecoinLegacy: regexp.MustCompile(`\b[LM3][a-km-zA-HJ-NP-Z1-9]{26,33}\b`),
+			cryptoLitecoinBech32: regexp.MustCompile(`\bltc1[a-z0-9]{39,59}\b`),
 
 			// Bitcoin Cash (bitcoincash: prefix or legacy 1/3)
-			"bitcoin_cash": regexp.MustCompile(`\bbitcoincash:[qp][a-z0-9]{41}\b`),
+			cryptoBitcoinCash: regexp.MustCompile(`\bbitcoincash:[qp][a-z0-9]{41}\b`),
 
 			// Dash (X prefix)
-			"dash": regexp.MustCompile(`\bX[1-9A-HJ-NP-Za-km-z]{33}\b`),
+			cryptoDash: regexp.MustCompile(`\bX[1-9A-HJ-NP-Za-km-z]{33}\b`),
 
 			// Zcash (t-addresses are transparent, z-addresses are shielded)
-			"zcash_transparent": regexp.MustCompile(`\bt1[a-zA-Z0-9]{33}\b`),
-			"zcash_shielded":    regexp.MustCompile(`\bzs[a-z0-9]{76}\b`),
+			cryptoZcashTransparent: regexp.MustCompile(`\bt1[a-zA-Z0-9]{33}\b`),
+			cryptoZcashShielded:    regexp.MustCompile(`\bzs[a-z0-9]{76}\b`),
 
 			// Dogecoin (D prefix)
-			"dogecoin": regexp.MustCompile(`\bD[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}\b`),
+			cryptoDogecoin: regexp.MustCompile(`\bD[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}\b`),
 		},
 	}
 }
@@ -107,7 +122,7 @@ func (a *CryptoAnalyzer) Analyze(ctx context.Context, data *AnalysisData) ([]mod
 					cryptoName := a.getCryptoName(cryptoType)
 					addr := model.CryptoAddress{Address: address, Type: cryptoType}
 					switch cryptoName {
-					case "Bitcoin":
+					case cryptoNameBitcoin:
 						data.Report.AnonymityReport.AddBitcoinAddress(addr)
 					case "Ethereum":
 						data.Report.AnonymityReport.AddEthereumAddress(addr)
@@ -125,17 +140,17 @@ func (a *CryptoAnalyzer) Analyze(ctx context.Context, data *AnalysisData) ([]mod
 // getTitle returns a human-readable title for the cryptocurrency type.
 func (a *CryptoAnalyzer) getTitle(cryptoType string) string {
 	titles := map[string]string{
-		"bitcoin_legacy":    "Bitcoin Address Found",
-		"bitcoin_bech32":    "Bitcoin Bech32 Address Found",
-		"ethereum":          "Ethereum Address Found",
-		"monero":            "Monero Address Found",
-		"litecoin_legacy":   "Litecoin Address Found",
-		"litecoin_bech32":   "Litecoin Bech32 Address Found",
-		"bitcoin_cash":      "Bitcoin Cash Address Found",
-		"dash":              "Dash Address Found",
-		"zcash_transparent": "Zcash Transparent Address Found",
-		"zcash_shielded":    "Zcash Shielded Address Found",
-		"dogecoin":          "Dogecoin Address Found",
+		cryptoBitcoinLegacy:    "Bitcoin Address Found",
+		cryptoBitcoinBech32:    "Bitcoin Bech32 Address Found",
+		cryptoEthereum:         "Ethereum Address Found",
+		cryptoMonero:           "Monero Address Found",
+		cryptoLitecoinLegacy:   "Litecoin Address Found",
+		cryptoLitecoinBech32:   "Litecoin Bech32 Address Found",
+		cryptoBitcoinCash:      "Bitcoin Cash Address Found",
+		cryptoDash:             "Dash Address Found",
+		cryptoZcashTransparent: "Zcash Transparent Address Found",
+		cryptoZcashShielded:    "Zcash Shielded Address Found",
+		cryptoDogecoin:         "Dogecoin Address Found",
 	}
 
 	if title, ok := titles[cryptoType]; ok {
@@ -147,17 +162,17 @@ func (a *CryptoAnalyzer) getTitle(cryptoType string) string {
 // getCryptoName returns the cryptocurrency name.
 func (a *CryptoAnalyzer) getCryptoName(cryptoType string) string {
 	names := map[string]string{
-		"bitcoin_legacy":    "Bitcoin",
-		"bitcoin_bech32":    "Bitcoin",
-		"ethereum":          "Ethereum",
-		"monero":            "Monero",
-		"litecoin_legacy":   "Litecoin",
-		"litecoin_bech32":   "Litecoin",
-		"bitcoin_cash":      "Bitcoin Cash",
-		"dash":              "Dash",
-		"zcash_transparent": "Zcash",
-		"zcash_shielded":    "Zcash",
-		"dogecoin":          "Dogecoin",
+		cryptoBitcoinLegacy:    cryptoNameBitcoin,
+		cryptoBitcoinBech32:    cryptoNameBitcoin,
+		cryptoEthereum:         "Ethereum",
+		cryptoMonero:           "Monero",
+		cryptoLitecoinLegacy:   "Litecoin",
+		cryptoLitecoinBech32:   "Litecoin",
+		cryptoBitcoinCash:      "Bitcoin Cash",
+		cryptoDash:             "Dash",
+		cryptoZcashTransparent: "Zcash",
+		cryptoZcashShielded:    "Zcash",
+		cryptoDogecoin:         "Dogecoin",
 	}
 
 	if name, ok := names[cryptoType]; ok {
@@ -169,19 +184,19 @@ func (a *CryptoAnalyzer) getCryptoName(cryptoType string) string {
 // getDescription returns a description for the cryptocurrency type.
 func (a *CryptoAnalyzer) getDescription(cryptoType string) string {
 	switch cryptoType {
-	case "bitcoin_legacy", "bitcoin_bech32":
+	case cryptoBitcoinLegacy, cryptoBitcoinBech32:
 		return "A Bitcoin address was found. Bitcoin transactions are publicly traceable " +
 			"and blockchain analysis can potentially link addresses to identities."
-	case "ethereum":
+	case cryptoEthereum:
 		return "An Ethereum address was found. Ethereum transactions are publicly traceable " +
 			"and can be analyzed to identify patterns and connections."
-	case "monero":
+	case cryptoMonero:
 		return "A Monero address was found. While Monero provides better privacy than Bitcoin, " +
 			"the presence of an address is still noted for correlation purposes."
-	case "zcash_shielded":
+	case cryptoZcashShielded:
 		return "A Zcash shielded address was found. Shielded addresses provide strong privacy, " +
 			"but the address format itself is still noted."
-	case "zcash_transparent":
+	case cryptoZcashTransparent:
 		return "A Zcash transparent address was found. Transparent addresses do not use Zcash's " +
 			"privacy features and transactions are publicly visible like Bitcoin."
 	default:
@@ -197,7 +212,7 @@ func (a *CryptoAnalyzer) getDescription(cryptoType string) string {
 //   - Privacy coins (Monero, Zcash shielded): Low (presence only)
 func (a *CryptoAnalyzer) getSeverity(cryptoType string) model.Severity {
 	switch cryptoType {
-	case "monero", "zcash_shielded":
+	case cryptoMonero, cryptoZcashShielded:
 		// Privacy coins - the address itself doesn't reveal much
 		return model.SeverityLow
 	default:

@@ -629,3 +629,131 @@ func TestGetScanReportByID(t *testing.T) {
 		}
 	})
 }
+
+func TestDatabaseErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("open fails when database directory is a file", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "not-a-directory")
+		if err := os.WriteFile(path, []byte("file"), 0o600); err != nil {
+			t.Fatalf("create file: %v", err)
+		}
+		if _, err := Open(path, DefaultOptions()); err == nil {
+			t.Fatal("expected directory creation error")
+		}
+	})
+
+	t.Run("open closes database after initialization failure", func(t *testing.T) {
+		t.Parallel()
+
+		dbDir := t.TempDir()
+		if err := os.Mkdir(filepath.Join(dbDir, "onionscan.db"), 0o750); err != nil {
+			t.Fatalf("create conflicting directory: %v", err)
+		}
+		for _, opts := range []Options{
+			{CreateIfNotExists: true, EnableWAL: true},
+			{CreateIfNotExists: true, EnableWAL: false},
+		} {
+			if _, err := Open(dbDir, opts); err == nil {
+				t.Fatalf("expected initialization error for options %+v", opts)
+			}
+		}
+	})
+
+	t.Run("operations report a closed database", func(t *testing.T) {
+		t.Parallel()
+
+		db, cleanup := setupTestDB(t)
+		cleanup()
+		ctx := context.Background()
+		report := model.NewOnionScanReport("closed.onion")
+
+		checks := []struct {
+			name string
+			call func() error
+		}{
+			{"create tables", db.createTables},
+			{"insert crawl", func() error { _, err := db.InsertCrawlRecord(ctx, &CrawlRecord{}); return err }},
+			{"get crawl", func() error { _, err := db.GetCrawlRecord(ctx, "url", "service"); return err }},
+			{"recent crawl", func() error { _, err := db.HasRecentCrawl(ctx, "url", time.Hour); return err }},
+			{"insert relationship", func() error { return db.InsertRelationship(ctx, &Relationship{}) }},
+			{"query relationships", func() error { _, err := db.QueryRelationships(ctx, "", ""); return err }},
+			{"save report", func() error { return db.SaveScanReport(ctx, report) }},
+			{"latest report", func() error { _, err := db.GetLatestScanReport(ctx, "service"); return err }},
+			{"list services", func() error { _, err := db.ListScannedServices(ctx); return err }},
+			{"scan history", func() error { _, err := db.GetScanHistory(ctx, "service"); return err }},
+			{"scan metadata", func() error { _, err := db.GetScanHistoryWithMetadata(ctx, "service"); return err }},
+			{"report by id", func() error { _, err := db.GetScanReportByID(ctx, 1); return err }},
+		}
+		for _, check := range checks {
+			if err := check.call(); err == nil {
+				t.Errorf("%s: expected error", check.name)
+			}
+		}
+	})
+}
+
+func TestDatabaseMalformedStoredData(t *testing.T) {
+	t.Parallel()
+
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	result, err := db.db.ExecContext(ctx, `
+		INSERT INTO crawls (url, onion_service, headers)
+		VALUES ('http://bad.onion', 'bad.onion', '{')`)
+	if err != nil {
+		t.Fatalf("insert malformed crawl: %v", err)
+	}
+	if _, err := result.LastInsertId(); err != nil {
+		t.Fatalf("get crawl id: %v", err)
+	}
+	if _, err := db.GetCrawlRecord(ctx, "http://bad.onion", "bad.onion"); err == nil {
+		t.Fatal("expected malformed headers error")
+	}
+
+	result, err = db.db.ExecContext(ctx, `
+		INSERT INTO scan_reports (onion_service, report_json, risk_summary)
+		VALUES ('bad.onion', '{', '{')`)
+	if err != nil {
+		t.Fatalf("insert malformed report: %v", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("get report id: %v", err)
+	}
+	if _, err := db.GetLatestScanReport(ctx, "bad.onion"); err == nil {
+		t.Fatal("expected malformed latest report error")
+	}
+	if history, err := db.GetScanHistory(ctx, "bad.onion"); err != nil || len(history) != 0 {
+		t.Fatalf("malformed history should be skipped: history=%v err=%v", history, err)
+	}
+	if _, err := db.GetScanReportByID(ctx, id); err == nil {
+		t.Fatal("expected malformed report by ID error")
+	}
+
+	metadata, err := db.GetScanHistoryWithMetadata(ctx, "bad.onion")
+	if err != nil || len(metadata) != 1 || len(metadata[0].RiskSummary) != 0 {
+		t.Fatalf("malformed risk summary should become empty: metadata=%v err=%v", metadata, err)
+	}
+
+	if _, err := db.db.ExecContext(ctx, `
+		INSERT INTO scan_reports (onion_service, report_json, risk_summary)
+		VALUES ('null-risk.onion', '{}', NULL)`); err != nil {
+		t.Fatalf("insert null risk summary: %v", err)
+	}
+	metadata, err = db.GetScanHistoryWithMetadata(ctx, "null-risk.onion")
+	if err != nil || len(metadata) != 1 || len(metadata[0].RiskSummary) != 0 {
+		t.Fatalf("null risk summary should become empty: metadata=%v err=%v", metadata, err)
+	}
+
+	if relationships, err := db.QueryRelationships(ctx, "", ""); err != nil || len(relationships) != 0 {
+		t.Fatalf("unfiltered relationship query: relationships=%v err=%v", relationships, err)
+	}
+	if got := parseTimestamp("not-a-timestamp"); !got.IsZero() {
+		t.Fatalf("invalid timestamp = %v, want zero", got)
+	}
+}

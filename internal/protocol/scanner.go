@@ -2,10 +2,23 @@ package protocol
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
 
 	"github.com/nao1215/onionscan/internal/model"
+	"golang.org/x/net/proxy"
 )
+
+const (
+	categoryDatabase              = "database"
+	categoryInformationDisclosure = "information-disclosure"
+	categorySecurityHeaders       = "security-headers"
+	locationHTTPHeaders           = "HTTP Headers"
+	locationSSHBanner             = "SSH Banner"
+)
+
+var errNilDialer = errors.New("protocol dialer must not be nil")
 
 // Scanner defines the interface for protocol-specific scanners.
 // Each protocol implementation must provide this interface to be used
@@ -147,6 +160,55 @@ type Finding struct {
 
 	// Category groups related findings (e.g., "email", "analytics").
 	Category string
+}
+
+// dialProxyWithContext establishes a connection through a proxy dialer while
+// honoring cancellation. Context-aware dialers are used directly. For legacy
+// dialers, a late connection is closed if the context wins the race so socket
+// resources are not leaked.
+func dialProxyWithContext(
+	ctx context.Context,
+	dialer proxy.Dialer,
+	address string,
+) (net.Conn, error) {
+	if dialer == nil {
+		return nil, errNilDialer
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if contextDialer, ok := dialer.(proxy.ContextDialer); ok {
+		return contextDialer.DialContext(ctx, "tcp", address)
+	}
+
+	type dialResult struct {
+		conn net.Conn
+		err  error
+	}
+	resultCh := make(chan dialResult)
+	go func() {
+		conn, err := dialer.Dial("tcp", address)
+		select {
+		case resultCh <- dialResult{conn: conn, err: err}:
+		case <-ctx.Done():
+			if conn != nil {
+				_ = conn.Close()
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-resultCh:
+		if err := ctx.Err(); err != nil {
+			if result.conn != nil {
+				_ = result.conn.Close()
+			}
+			return nil, err
+		}
+		return result.conn, result.err
+	}
 }
 
 // NewScanResult creates a new ScanResult with initialized maps.

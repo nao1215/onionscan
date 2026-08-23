@@ -6,9 +6,38 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
+
+type torRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f torRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+type stubContextDialer struct {
+	dialContext func(context.Context, string, string) (net.Conn, error)
+}
+
+func (d stubContextDialer) Dial(network, address string) (net.Conn, error) {
+	return d.dialContext(context.Background(), network, address)
+}
+
+func (d stubContextDialer) DialContext(
+	ctx context.Context,
+	network string,
+	address string,
+) (net.Conn, error) {
+	return d.dialContext(ctx, network, address)
+}
+
+type timeoutTestError struct{}
+
+func (timeoutTestError) Error() string   { return "timeout" }
+func (timeoutTestError) Timeout() bool   { return true }
+func (timeoutTestError) Temporary() bool { return true }
 
 // TestNewClient tests the Client constructor.
 func TestNewClient(t *testing.T) {
@@ -120,6 +149,9 @@ func TestIsValidProxyAddress(t *testing.T) {
 		{"empty port", "127.0.0.1:", false},
 		{"multiple colons", "127.0.0.1:9050:extra", false},
 		{"only colon", ":", false},
+		{"non-numeric port", "127.0.0.1:http", false},
+		{"port too large", "127.0.0.1:65536", false},
+		{"zero port", "127.0.0.1:0", false},
 	}
 
 	for _, tc := range testCases {
@@ -343,6 +375,59 @@ func TestHeaderInjectingTransport(t *testing.T) {
 	})
 }
 
+func TestHeaderInjectingTransportRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		existingCookie string
+		injectedCookie string
+		wantCookie     string
+	}{
+		{name: "sets cookie", injectedCookie: "session=new", wantCookie: "session=new"},
+		{name: "appends cookie", existingCookie: "theme=dark", injectedCookie: "session=new", wantCookie: "theme=dark; session=new"},
+		{name: "leaves cookie empty"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var received *http.Request
+			base := torRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				received = req
+				return &http.Response{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(strings.NewReader("")),
+					Request:    req,
+				}, nil
+			})
+			transport := &headerInjectingTransport{
+				base:    base,
+				cookie:  tc.injectedCookie,
+				headers: map[string]string{"X-Test": "injected"},
+			}
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.onion", nil)
+			if err != nil {
+				t.Fatalf("create request: %v", err)
+			}
+			req.Header.Set("Cookie", tc.existingCookie)
+
+			resp, err := transport.RoundTrip(req)
+			if err != nil {
+				t.Fatalf("round trip: %v", err)
+			}
+			_ = resp.Body.Close()
+			if received.Header.Get("Cookie") != tc.wantCookie || received.Header.Get("X-Test") != "injected" {
+				t.Fatalf("received headers: %v", received.Header)
+			}
+			if req.Header.Get("X-Test") != "" || req.Header.Get("Cookie") != tc.existingCookie {
+				t.Fatal("original request was modified")
+			}
+		})
+	}
+}
+
 // TestClientTimeout tests client timeout handling.
 func TestClientTimeout(t *testing.T) {
 	t.Parallel()
@@ -385,6 +470,16 @@ func TestNewHTTPClientConfiguration(t *testing.T) {
 		t.Parallel()
 		if httpClient.CheckRedirect == nil {
 			t.Error("expected CheckRedirect to be set")
+		}
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.onion", nil)
+		if err != nil {
+			t.Fatalf("create request: %v", err)
+		}
+		if err := httpClient.CheckRedirect(req, make([]*http.Request, 9)); err != nil {
+			t.Fatalf("nine redirects should be allowed: %v", err)
+		}
+		if err := httpClient.CheckRedirect(req, make([]*http.Request, 10)); !errors.Is(err, http.ErrUseLastResponse) {
+			t.Fatalf("ten redirects should stop: %v", err)
 		}
 	})
 
@@ -437,6 +532,59 @@ func TestDialMethod(t *testing.T) {
 			t.Log("Dial succeeded (Tor proxy may be running)")
 		}
 	})
+}
+
+func TestDialWithoutConfiguredTimeout(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("dial failed")
+	dialer := stubContextDialer{dialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+		if ctx == nil || network != "tcp" || address != "example.onion:80" {
+			t.Fatalf("unexpected dial arguments: ctx=%v network=%q address=%q", ctx, network, address)
+		}
+		return nil, expectedErr
+	}}
+	client := &Client{contextDialer: dialer}
+
+	if _, err := client.Dial("tcp", "example.onion:80"); !errors.Is(err, expectedErr) {
+		t.Fatalf("Dial error = %v", err)
+	}
+	if _, err := client.DialContext(context.Background(), "tcp", "example.onion:80"); !errors.Is(err, expectedErr) {
+		t.Fatalf("DialContext error = %v", err)
+	}
+	if _, err := client.DialContext(nil, "tcp", "example.onion:80"); err == nil { //nolint:staticcheck // Explicitly verify nil rejection.
+		t.Fatal("expected nil context error")
+	}
+}
+
+func TestDialReturnsConnection(t *testing.T) {
+	t.Parallel()
+
+	clientConn, serverConn := net.Pipe()
+	defer serverConn.Close()
+	client := &Client{
+		timeout: time.Second,
+		contextDialer: stubContextDialer{dialContext: func(context.Context, string, string) (net.Conn, error) {
+			return clientConn, nil
+		}},
+	}
+	conn, err := client.Dial("tcp", "example.onion:80")
+	if err != nil {
+		t.Fatalf("Dial() error = %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		t.Fatalf("close connection: %v", err)
+	}
+}
+
+func TestNormalizeDialErrorTimeout(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := normalizeDialError(ctx, timeoutTestError{}); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("normalizeDialError() = %v", err)
+	}
 }
 
 // TestCheckConnection tests the SOCKS5 proxy verification.
@@ -630,6 +778,69 @@ func TestCheckConnection(t *testing.T) {
 			t.Errorf("expected ProxyStatusCannotConnect or ProxyStatusTimeout, got %v", status)
 		}
 	})
+}
+
+func TestCheckConnectionMalformedHandshake(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		handler func(net.Conn)
+	}{
+		{
+			name: "server closes before authentication response",
+			handler: func(conn net.Conn) {
+				greeting := make([]byte, 3)
+				_, _ = io.ReadFull(conn, greeting)
+			},
+		},
+		{
+			name: "server selects unknown authentication method",
+			handler: func(conn net.Conn) {
+				greeting := make([]byte, 3)
+				_, _ = io.ReadFull(conn, greeting)
+				_, _ = conn.Write([]byte{socks5Version, 0x02})
+			},
+		},
+		{
+			name: "server closes before connect response",
+			handler: func(conn net.Conn) {
+				greeting := make([]byte, 3)
+				_, _ = io.ReadFull(conn, greeting)
+				_, _ = conn.Write([]byte{socks5Version, socks5AuthNone})
+				request := make([]byte, 4+1+len(socks5TestOnion)+2)
+				_, _ = io.ReadFull(conn, request)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			listener, err := net.Listen("tcp", "127.0.0.1:0") //nolint:noctx // test server
+			if err != nil {
+				t.Fatalf("listen: %v", err)
+			}
+			defer listener.Close()
+			go func() {
+				conn, err := listener.Accept()
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+				tc.handler(conn)
+			}()
+
+			client, err := NewClient(listener.Addr().String(), time.Second)
+			if err != nil {
+				t.Fatalf("create client: %v", err)
+			}
+			if status := client.CheckConnection(context.Background()); status != ProxyStatusWrongType {
+				t.Fatalf("status = %v, want %v", status, ProxyStatusWrongType)
+			}
+		})
+	}
 }
 
 // TestDialContext tests the DialContext method.

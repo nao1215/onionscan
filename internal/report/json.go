@@ -98,10 +98,13 @@ func (w *JSONWriter) writeJSON(v interface{}) (int, error) {
 		return 0, err
 	}
 
-	// Add trailing newline for better terminal output
-	data = append(data, '\n')
+	// Add trailing newline for better terminal output without extending the
+	// marshaler-owned buffer in place.
+	terminated := make([]byte, len(data)+1)
+	copy(terminated, data)
+	terminated[len(data)] = '\n'
 
-	return w.output.Write(data)
+	return w.output.Write(terminated)
 }
 
 // JSONReport is a wrapper for the full report with additional metadata.

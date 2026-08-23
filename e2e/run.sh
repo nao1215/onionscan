@@ -27,7 +27,7 @@ mkdir -p "$E2E_TMP/bin"
 
 COVER_FLAGS=()
 if [ -n "${COVER:-}" ]; then
-	COVER_FLAGS=(-cover -covermode=atomic -coverpkg=./...)
+	COVER_FLAGS=(-cover -covermode=atomic "-coverpkg=${COVERPKG:-./...}")
 	echo "e2e: building coverage-instrumented OnionScan"
 fi
 

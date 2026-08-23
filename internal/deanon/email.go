@@ -8,6 +8,8 @@ import (
 	"github.com/nao1215/onionscan/internal/model"
 )
 
+const analyzerTypeEmail = "email"
+
 // EmailAnalyzer detects email addresses in page content.
 // Email addresses are significant deanonymization vectors as they
 // often contain real names or can be traced to individuals.
@@ -40,7 +42,7 @@ func NewEmailAnalyzer() *EmailAnalyzer {
 
 // Name returns the analyzer name.
 func (a *EmailAnalyzer) Name() string {
-	return "email"
+	return analyzerTypeEmail
 }
 
 // Category returns the analyzer category.
@@ -76,7 +78,7 @@ func (a *EmailAnalyzer) Analyze(ctx context.Context, data *AnalysisData) ([]mode
 			severity := a.assessEmailSeverity(email)
 
 			findings = append(findings, model.Finding{
-				Type:         "email",
+				Type:         analyzerTypeEmail,
 				Title:        "Email Address Found",
 				Description:  "An email address was found in page content. This could be used to identify the operator.",
 				Severity:     severity,

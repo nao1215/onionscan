@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -89,7 +88,7 @@ func (s *SSHScanner) Scan(ctx context.Context, target string) (*ScanResult, erro
 	defer cancel()
 
 	// Connect to SSH port
-	conn, err := s.dialWithContext(ctx, "tcp", host)
+	conn, err := dialProxyWithContext(ctx, s.dialer, host)
 	if err != nil {
 		// Connection refused or timeout - service not running
 		return result, nil
@@ -122,33 +121,6 @@ func (s *SSHScanner) Scan(ctx context.Context, target string) (*ScanResult, erro
 	return result, nil
 }
 
-// dialWithContext dials a connection respecting context cancellation.
-//
-// Design decision: We implement our own context-aware dial because
-// net.Dialer.DialContext requires a network and address, but we need
-// to support custom dialers (like SOCKS5 proxies).
-func (s *SSHScanner) dialWithContext(ctx context.Context, network, address string) (net.Conn, error) {
-	// Use a channel to receive the connection result
-	type dialResult struct {
-		conn net.Conn
-		err  error
-	}
-
-	resultCh := make(chan dialResult, 1)
-
-	go func() {
-		conn, err := s.dialer.Dial(network, address)
-		resultCh <- dialResult{conn, err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case result := <-resultCh:
-		return result.conn, result.err
-	}
-}
-
 // analyzeBanner analyzes the SSH banner for security information.
 //
 // SSH banners typically have the format: SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.1
@@ -166,7 +138,7 @@ func (s *SSHScanner) analyzeBanner(result *ScanResult) {
 			Description: "SSH protocol version 1 is deprecated and has known vulnerabilities. Only SSH-2 should be used.",
 			Severity:    model.SeverityHigh,
 			Value:       banner,
-			Location:    "SSH Banner",
+			Location:    locationSSHBanner,
 			Category:    "protocol-version",
 		})
 	}
@@ -190,8 +162,8 @@ func (s *SSHScanner) analyzeBanner(result *ScanResult) {
 		Description: "The SSH server discloses its version information. This helps attackers identify potential vulnerabilities.",
 		Severity:    model.SeverityInfo,
 		Value:       banner,
-		Location:    "SSH Banner",
-		Category:    "information-disclosure",
+		Location:    locationSSHBanner,
+		Category:    categoryInformationDisclosure,
 	})
 }
 
@@ -229,8 +201,8 @@ func (s *SSHScanner) detectOSFromBanner(result *ScanResult, versionInfo string) 
 			Description: fmt.Sprintf("The SSH banner reveals the operating system: %s. This helps narrow down attack vectors.", os),
 			Severity:    model.SeverityLow,
 			Value:       os,
-			Location:    "SSH Banner",
-			Category:    "information-disclosure",
+			Location:    locationSSHBanner,
+			Category:    categoryInformationDisclosure,
 		})
 	}
 }
@@ -260,7 +232,7 @@ func (s *SSHScanner) checkVulnerableVersions(result *ScanResult, versionInfo str
 					Description: "This OpenSSH version is quite old and may have known vulnerabilities. Consider updating.",
 					Severity:    model.SeverityMedium,
 					Value:       versionInfo,
-					Location:    "SSH Banner",
+					Location:    locationSSHBanner,
 					Category:    "outdated-software",
 				})
 			}
@@ -275,7 +247,7 @@ func (s *SSHScanner) checkVulnerableVersions(result *ScanResult, versionInfo str
 			Description: "Dropbear is commonly used on embedded devices and routers. This may indicate a resource-constrained environment.",
 			Severity:    model.SeverityInfo,
 			Value:       versionInfo,
-			Location:    "SSH Banner",
+			Location:    locationSSHBanner,
 			Category:    "fingerprinting",
 		})
 	}

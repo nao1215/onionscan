@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"context"
-	"net"
 	"strings"
 	"time"
 
@@ -80,7 +79,7 @@ func (s *FTPScanner) Scan(ctx context.Context, target string) (*ScanResult, erro
 	defer cancel()
 
 	// Connect to FTP port
-	conn, err := s.dialWithContext(ctx, "tcp", host)
+	conn, err := dialProxyWithContext(ctx, s.dialer, host)
 	if err != nil {
 		return result, nil
 	}
@@ -127,28 +126,6 @@ func (s *FTPScanner) Scan(ctx context.Context, target string) (*ScanResult, erro
 	return result, nil
 }
 
-// dialWithContext dials a connection respecting context cancellation.
-func (s *FTPScanner) dialWithContext(ctx context.Context, network, address string) (net.Conn, error) {
-	type dialResult struct {
-		conn net.Conn
-		err  error
-	}
-
-	resultCh := make(chan dialResult, 1)
-
-	go func() {
-		conn, err := s.dialer.Dial(network, address)
-		resultCh <- dialResult{conn, err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case result := <-resultCh:
-		return result.conn, result.err
-	}
-}
-
 // analyzeBanner analyzes the FTP banner for security information.
 //
 // FTP banners often contain:
@@ -188,7 +165,7 @@ func (s *FTPScanner) analyzeBanner(result *ScanResult) {
 		Severity:    model.SeverityInfo,
 		Value:       banner,
 		Location:    "FTP Banner (Port 21)",
-		Category:    "information-disclosure",
+		Category:    categoryInformationDisclosure,
 	})
 }
 
@@ -213,7 +190,7 @@ func (s *FTPScanner) checkBannerLeaks(result *ScanResult) {
 				Severity:    model.SeverityMedium,
 				Value:       banner,
 				Location:    "FTP Banner",
-				Category:    "information-disclosure",
+				Category:    categoryInformationDisclosure,
 			})
 		}
 	}
@@ -226,7 +203,7 @@ func (s *FTPScanner) checkBannerLeaks(result *ScanResult) {
 			Severity:    model.SeverityLow,
 			Value:       banner,
 			Location:    "FTP Banner",
-			Category:    "information-disclosure",
+			Category:    categoryInformationDisclosure,
 		})
 	}
 }
