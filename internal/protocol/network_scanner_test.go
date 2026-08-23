@@ -8,14 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
-
-type dialerFunc func(network, address string) (net.Conn, error)
-
-func (f dialerFunc) Dial(network, address string) (net.Conn, error) {
-	return f(network, address)
-}
 
 type contextDialerFunc struct {
 	dialContext func(context.Context, string, string) (net.Conn, error)
@@ -33,15 +26,15 @@ func (d contextDialerFunc) DialContext(
 	return d.dialContext(ctx, network, address)
 }
 
-func pipeDialer(handler func(net.Conn)) dialerFunc {
-	return func(_, _ string) (net.Conn, error) {
+func pipeDialer(handler func(net.Conn)) contextDialerFunc {
+	return contextDialerFunc{dialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 		client, server := net.Pipe()
 		go func() {
 			defer server.Close()
 			handler(server)
 		}()
 		return client, nil
-	}
+	}}
 }
 
 func TestDialProxyWithContext(t *testing.T) {
@@ -79,16 +72,16 @@ func TestDialProxyWithContext(t *testing.T) {
 		}
 	})
 
-	t.Run("returns an already cancelled context", func(t *testing.T) {
+	t.Run("returns an already canceled context", func(t *testing.T) {
 		t.Parallel()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		var called atomic.Bool
-		dialer := dialerFunc(func(_, _ string) (net.Conn, error) {
+		dialer := contextDialerFunc{dialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 			called.Store(true)
 			return nil, nil
-		})
+		}}
 
 		_, err := dialProxyWithContext(ctx, dialer, "example.onion:80")
 		if !errors.Is(err, context.Canceled) {
@@ -96,45 +89,6 @@ func TestDialProxyWithContext(t *testing.T) {
 		}
 		if called.Load() {
 			t.Fatal("dialer was called after cancellation")
-		}
-	})
-
-	t.Run("closes a legacy dialer's late connection", func(t *testing.T) {
-		t.Parallel()
-
-		dialStarted := make(chan struct{})
-		releaseDial := make(chan struct{})
-		peerClosed := make(chan struct{})
-		dialer := dialerFunc(func(_, _ string) (net.Conn, error) {
-			close(dialStarted)
-			<-releaseDial
-			client, server := net.Pipe()
-			go func() {
-				defer close(peerClosed)
-				defer server.Close()
-				buffer := make([]byte, 1)
-				_, _ = server.Read(buffer)
-			}()
-			return client, nil
-		})
-
-		ctx, cancel := context.WithCancel(context.Background())
-		result := make(chan error, 1)
-		go func() {
-			_, err := dialProxyWithContext(ctx, dialer, "example.onion:80")
-			result <- err
-		}()
-		<-dialStarted
-		cancel()
-		if err := <-result; !errors.Is(err, context.Canceled) {
-			t.Fatalf("expected context cancellation, got %v", err)
-		}
-		close(releaseDial)
-
-		select {
-		case <-peerClosed:
-		case <-time.After(time.Second):
-			t.Fatal("late proxy connection was not closed")
 		}
 	})
 }

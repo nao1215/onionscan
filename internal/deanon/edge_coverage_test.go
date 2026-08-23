@@ -28,7 +28,7 @@ func TestSocialAnalyzerEdgePaths(t *testing.T) {
 	cancel()
 	findings, err := analyzer.Analyze(ctx, &AnalysisData{Pages: []*model.Page{{}}})
 	if !errors.Is(err, context.Canceled) || len(findings) != 0 {
-		t.Fatalf("cancelled Analyze() findings=%v err=%v", findings, err)
+		t.Fatalf("canceled Analyze() findings=%v err=%v", findings, err)
 	}
 }
 

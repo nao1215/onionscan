@@ -1071,11 +1071,11 @@ func TestRunScanWithContextCancellation(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	// This should fail early due to cancelled context or connection failure
+	// This should fail early due to canceled context or connection failure
 	err := runScan(ctx, cfg, logger)
 	// Either context.Canceled or connection error is acceptable
 	if err == nil {
-		t.Error("expected error due to cancelled context or connection failure")
+		t.Error("expected error due to canceled context or connection failure")
 	}
 }
 

@@ -422,7 +422,7 @@ func (s *DeanonStep) Do(ctx context.Context, report *model.OnionScanReport) erro
 type ProtocolScanStep struct {
 	// dialer establishes protocol connections. It defaults to the Tor client's
 	// dialer and can be replaced in tests or by alternative proxy setups.
-	dialer proxy.Dialer
+	dialer proxy.ContextDialer
 
 	// protocols lists which protocols to scan.
 	protocols []string
@@ -460,7 +460,7 @@ func WithProtocolLogger(logger *slog.Logger) ProtocolScanStepOption {
 }
 
 // WithProtocolDialer sets the dialer used by all non-HTTP protocol scanners.
-func WithProtocolDialer(dialer proxy.Dialer) ProtocolScanStepOption {
+func WithProtocolDialer(dialer proxy.ContextDialer) ProtocolScanStepOption {
 	return func(s *ProtocolScanStep) {
 		s.dialer = dialer
 	}
@@ -476,7 +476,7 @@ func NewProtocolScanStep(client *tor.Client, opts ...ProtocolScanStepOption) *Pr
 		logger: slog.Default(),
 	}
 	if client != nil {
-		s.dialer = client.Dialer()
+		s.dialer = client
 	}
 
 	for _, opt := range opts {

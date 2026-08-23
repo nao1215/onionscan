@@ -19,7 +19,7 @@ import (
 //  3. FTP servers often have verbose banners
 type FTPScanner struct {
 	// dialer is used to establish connections through Tor.
-	dialer proxy.Dialer
+	dialer proxy.ContextDialer
 
 	// timeout is the connection timeout.
 	timeout time.Duration
@@ -37,7 +37,7 @@ func WithFTPTimeout(timeout time.Duration) FTPScannerOption {
 
 // NewFTPScanner creates a new FTP scanner.
 // The dialer should be configured to use the Tor SOCKS5 proxy.
-func NewFTPScanner(dialer proxy.Dialer, opts ...FTPScannerOption) *FTPScanner {
+func NewFTPScanner(dialer proxy.ContextDialer, opts ...FTPScannerOption) *FTPScanner {
 	s := &FTPScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,

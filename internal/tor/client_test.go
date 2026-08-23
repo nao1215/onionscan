@@ -773,7 +773,7 @@ func TestCheckConnection(t *testing.T) {
 		cancel() // Cancel immediately
 
 		status := client.CheckConnection(ctx)
-		// Should return CannotConnect or Timeout due to cancelled context
+		// Should return CannotConnect or Timeout due to canceled context
 		if status != ProxyStatusCannotConnect && status != ProxyStatusTimeout {
 			t.Errorf("expected ProxyStatusCannotConnect or ProxyStatusTimeout, got %v", status)
 		}
@@ -852,7 +852,7 @@ func TestDialContext(t *testing.T) {
 		t.Fatalf("failed to create client: %v", err)
 	}
 
-	t.Run("returns error for cancelled context", func(t *testing.T) {
+	t.Run("returns error for canceled context", func(t *testing.T) {
 		t.Parallel()
 
 		ctx, cancel := context.WithCancel(context.Background())

@@ -19,7 +19,7 @@ import (
 //  3. Mail server misconfiguration can leak identity
 type SMTPScanner struct {
 	// dialer is used to establish connections through Tor.
-	dialer proxy.Dialer
+	dialer proxy.ContextDialer
 
 	// timeout is the connection timeout.
 	timeout time.Duration
@@ -37,7 +37,7 @@ func WithSMTPTimeout(timeout time.Duration) SMTPScannerOption {
 
 // NewSMTPScanner creates a new SMTP scanner.
 // The dialer should be configured to use the Tor SOCKS5 proxy.
-func NewSMTPScanner(dialer proxy.Dialer, opts ...SMTPScannerOption) *SMTPScanner {
+func NewSMTPScanner(dialer proxy.ContextDialer, opts ...SMTPScannerOption) *SMTPScanner {
 	s := &SMTPScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,

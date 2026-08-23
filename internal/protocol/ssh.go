@@ -21,7 +21,7 @@ import (
 //  4. Minimizes attack surface by not implementing full SSH
 type SSHScanner struct {
 	// dialer is used to establish connections through Tor.
-	dialer proxy.Dialer
+	dialer proxy.ContextDialer
 
 	// timeout is the connection timeout.
 	timeout time.Duration
@@ -40,11 +40,11 @@ func WithSSHTimeout(timeout time.Duration) SSHScannerOption {
 // NewSSHScanner creates a new SSH scanner.
 // The dialer should be configured to use the Tor SOCKS5 proxy.
 //
-// Design decision: We take a proxy.Dialer rather than creating one because:
+// Design decision: We take a proxy.ContextDialer rather than creating one because:
 //  1. Tor proxy configuration is handled by the tor package
 //  2. Consistent with other scanners that take configured clients
 //  3. Allows for testing with mock dialers
-func NewSSHScanner(dialer proxy.Dialer, opts ...SSHScannerOption) *SSHScanner {
+func NewSSHScanner(dialer proxy.ContextDialer, opts ...SSHScannerOption) *SSHScanner {
 	s := &SSHScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,

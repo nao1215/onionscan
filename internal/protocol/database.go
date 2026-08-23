@@ -26,12 +26,12 @@ const (
 //  2. Default configurations often have no authentication
 //  3. Database banners reveal software versions
 type MongoDBScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewMongoDBScanner creates a new MongoDB scanner.
-func NewMongoDBScanner(dialer proxy.Dialer) *MongoDBScanner {
+func NewMongoDBScanner(dialer proxy.ContextDialer) *MongoDBScanner {
 	return &MongoDBScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,
@@ -80,12 +80,12 @@ func (s *MongoDBScanner) Scan(ctx context.Context, target string) (*ScanResult, 
 // RedisScanner performs Redis scanning on onion services.
 // It connects to port 6379 to detect Redis servers.
 type RedisScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewRedisScanner creates a new Redis scanner.
-func NewRedisScanner(dialer proxy.Dialer) *RedisScanner {
+func NewRedisScanner(dialer proxy.ContextDialer) *RedisScanner {
 	return &RedisScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,
@@ -165,12 +165,12 @@ func (s *RedisScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 // PostgreSQLScanner performs PostgreSQL scanning on onion services.
 // It connects to port 5432 to detect PostgreSQL servers.
 type PostgreSQLScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewPostgreSQLScanner creates a new PostgreSQL scanner.
-func NewPostgreSQLScanner(dialer proxy.Dialer) *PostgreSQLScanner {
+func NewPostgreSQLScanner(dialer proxy.ContextDialer) *PostgreSQLScanner {
 	return &PostgreSQLScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,
@@ -218,12 +218,12 @@ func (s *PostgreSQLScanner) Scan(ctx context.Context, target string) (*ScanResul
 // MySQLScanner performs MySQL scanning on onion services.
 // It connects to port 3306 to detect MySQL/MariaDB servers.
 type MySQLScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewMySQLScanner creates a new MySQL scanner.
-func NewMySQLScanner(dialer proxy.Dialer) *MySQLScanner {
+func NewMySQLScanner(dialer proxy.ContextDialer) *MySQLScanner {
 	return &MySQLScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,

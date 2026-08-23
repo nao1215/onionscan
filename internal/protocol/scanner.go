@@ -162,13 +162,12 @@ type Finding struct {
 	Category string
 }
 
-// dialProxyWithContext establishes a connection through a proxy dialer while
-// honoring cancellation. Context-aware dialers are used directly. For legacy
-// dialers, a late connection is closed if the context wins the race so socket
-// resources are not leaked.
+// dialProxyWithContext establishes a connection through a context-aware proxy
+// dialer. Requiring DialContext prevents a canceled scan from retaining a
+// goroutine blocked in an unbounded legacy Dial call.
 func dialProxyWithContext(
 	ctx context.Context,
-	dialer proxy.Dialer,
+	dialer proxy.ContextDialer,
 	address string,
 ) (net.Conn, error) {
 	if dialer == nil {
@@ -177,38 +176,7 @@ func dialProxyWithContext(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if contextDialer, ok := dialer.(proxy.ContextDialer); ok {
-		return contextDialer.DialContext(ctx, "tcp", address)
-	}
-
-	type dialResult struct {
-		conn net.Conn
-		err  error
-	}
-	resultCh := make(chan dialResult)
-	go func() {
-		conn, err := dialer.Dial("tcp", address)
-		select {
-		case resultCh <- dialResult{conn: conn, err: err}:
-		case <-ctx.Done():
-			if conn != nil {
-				_ = conn.Close()
-			}
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case result := <-resultCh:
-		if err := ctx.Err(); err != nil {
-			if result.conn != nil {
-				_ = result.conn.Close()
-			}
-			return nil, err
-		}
-		return result.conn, result.err
-	}
+	return dialer.DialContext(ctx, "tcp", address)
 }
 
 // NewScanResult creates a new ScanResult with initialized maps.

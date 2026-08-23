@@ -26,6 +26,17 @@ func (f pipelineDialerFunc) Dial(network, address string) (net.Conn, error) {
 	return f(network, address)
 }
 
+func (f pipelineDialerFunc) DialContext(
+	ctx context.Context,
+	network string,
+	address string,
+) (net.Conn, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return f(network, address)
+}
+
 type pipelineRoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f pipelineRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -663,7 +674,7 @@ func TestDeanonStepDo(t *testing.T) {
 		}
 	})
 
-	t.Run("keeps partial findings when context is cancelled", func(t *testing.T) {
+	t.Run("keeps partial findings when context is canceled", func(t *testing.T) {
 		step := NewDeanonStep()
 		report := model.NewOnionScanReport("test.onion")
 		report.CrawledPages = []*model.Page{{URL: "http://test.onion/", Snapshot: "admin@example.com"}}
@@ -732,9 +743,9 @@ func TestProtocolScanStepDo(t *testing.T) {
 		t.Fatal("expected a missing dialer error")
 	}
 
-	cancelled, cancel := context.WithCancel(context.Background())
+	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := step.Do(cancelled, model.NewOnionScanReport("test.onion")); !errors.Is(err, context.Canceled) {
+	if err := step.Do(canceled, model.NewOnionScanReport("test.onion")); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation, got %v", err)
 	}
 }
