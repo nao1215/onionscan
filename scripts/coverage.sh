@@ -11,12 +11,16 @@ COVERAGE_ROOT="$REPO_ROOT/.coverage"
 rm -rf "$COVERAGE_ROOT"
 mkdir -p "$COVERAGE_ROOT/unit" "$COVERAGE_ROOT/e2e" "$COVERAGE_ROOT/merged"
 
+# Keep the coverage denominator focused on production packages. The tornago
+# fixture is test infrastructure and is built separately without instrumentation.
+COVER_PACKAGES="$(go list ./cmd/... ./internal/... | paste -sd, -)"
+
 echo ">> unit coverage"
-go test -short -count=1 -cover -covermode=atomic -coverpkg=./... ./... \
+go test -short -count=1 -cover -covermode=atomic -coverpkg="$COVER_PACKAGES" ./... \
 	-args -test.gocoverdir="$COVERAGE_ROOT/unit"
 
 echo ">> atago E2E coverage"
-COVER=1 GOCOVERDIR="$COVERAGE_ROOT/e2e" "$REPO_ROOT/e2e/run.sh"
+COVER=1 COVERPKG="$COVER_PACKAGES" GOCOVERDIR="$COVERAGE_ROOT/e2e" "$REPO_ROOT/e2e/run.sh"
 
 echo ">> merge unit and E2E coverage"
 go tool covdata merge -i="$COVERAGE_ROOT/unit,$COVERAGE_ROOT/e2e" -o="$COVERAGE_ROOT/merged"

@@ -4,15 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nao1215/onionscan/internal/config"
 	"github.com/nao1215/onionscan/internal/database"
 	"github.com/nao1215/onionscan/internal/model"
+	"github.com/nao1215/onionscan/internal/tor"
+	"github.com/spf13/cobra"
 )
 
 // TestNewScanCmd tests the scan command creation.
@@ -349,6 +353,83 @@ sites:
 
 		if cfg.ReportFile != "/tmp/report.json" {
 			t.Errorf("expected ReportFile '/tmp/report.json', got %q", cfg.ReportFile)
+		}
+	})
+}
+
+func TestBuildConfigMissingFlags(t *testing.T) {
+	t.Parallel()
+
+	type flagDefinition struct {
+		name   string
+		define func(*cobra.Command)
+	}
+	definitions := []flagDefinition{
+		{"external-tor", func(cmd *cobra.Command) { cmd.Flags().String("external-tor", "", "") }},
+		{"tor-timeout", func(cmd *cobra.Command) { cmd.Flags().Duration("tor-timeout", time.Minute, "") }},
+		{"timeout", func(cmd *cobra.Command) { cmd.Flags().Duration("timeout", time.Minute, "") }},
+		{"depth", func(cmd *cobra.Command) { cmd.Flags().Int("depth", 1, "") }},
+		{"max-pages", func(cmd *cobra.Command) { cmd.Flags().Int("max-pages", 1, "") }},
+		{"batch", func(cmd *cobra.Command) { cmd.Flags().Int("batch", 1, "") }},
+		{"config", func(cmd *cobra.Command) { cmd.Flags().String("config", "", "") }},
+		{"json", func(cmd *cobra.Command) { cmd.Flags().Bool("json", false, "") }},
+		{"markdown", func(cmd *cobra.Command) { cmd.Flags().Bool("markdown", false, "") }},
+		{"output", func(cmd *cobra.Command) { cmd.Flags().String("output", "", "") }},
+		{"crawl-delay", func(cmd *cobra.Command) { cmd.Flags().Duration("crawl-delay", 0, "") }},
+		{"user-agent", func(cmd *cobra.Command) { cmd.Flags().String("user-agent", "test", "") }},
+		{"max-body-size", func(cmd *cobra.Command) { cmd.Flags().Int64("max-body-size", 1, "") }},
+	}
+
+	for missingIndex, missing := range definitions {
+		t.Run(missing.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := &cobra.Command{}
+			for _, definition := range definitions[:missingIndex] {
+				definition.define(cmd)
+			}
+			if _, err := buildConfig(cmd, []string{"test.onion"}); err == nil {
+				t.Fatalf("expected missing %s flag error", missing.name)
+			}
+		})
+	}
+}
+
+func TestBuildConfigAdditionalPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("explicit missing config", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewScanCmd()
+		path := filepath.Join(t.TempDir(), "missing.yaml")
+		_ = cmd.Flags().Set("config", path)
+		if _, err := buildConfig(cmd, []string{"test.onion"}); err == nil || !strings.Contains(err.Error(), "configuration file not found") {
+			t.Fatalf("expected missing config error, got %v", err)
+		}
+	})
+
+	t.Run("zero max body size uses default", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := NewScanCmd()
+		_ = cmd.Flags().Set("max-body-size", "0")
+		cfg, err := buildConfig(cmd, []string{"test.onion"})
+		if err != nil || cfg.MaxBodySize != config.DefaultMaxBodySize {
+			t.Fatalf("max body size = %d, err=%v", cfg.MaxBodySize, err)
+		}
+	})
+
+	t.Run("run command reports build and validation errors", func(t *testing.T) {
+		t.Parallel()
+
+		if err := runScanCmd(&cobra.Command{}, []string{"test.onion"}); err == nil {
+			t.Fatal("expected flag error")
+		}
+		cmd := NewScanCmd()
+		_ = cmd.Flags().Set("timeout", "0s")
+		if err := runScanCmd(cmd, []string{"test.onion"}); err == nil || !strings.Contains(err.Error(), "configuration error") {
+			t.Fatalf("expected validation error, got %v", err)
 		}
 	})
 }
@@ -691,6 +772,24 @@ func TestOutputReport(t *testing.T) {
 			t.Error("expected SimpleReport to be initialized")
 		}
 	})
+
+	t.Run("returns directory creation error", func(t *testing.T) {
+		parentFile := filepath.Join(t.TempDir(), "file")
+		if err := os.WriteFile(parentFile, []byte("file"), 0o600); err != nil {
+			t.Fatalf("create parent file: %v", err)
+		}
+		cfg := &config.Config{JSONReport: true, ReportFile: filepath.Join(parentFile, "report.json")}
+		if err := outputReport(cfg, model.NewOnionScanReport("test.onion")); err == nil || !strings.Contains(err.Error(), "failed to create output directory") {
+			t.Fatalf("expected directory creation error, got %v", err)
+		}
+	})
+
+	t.Run("returns output file creation error", func(t *testing.T) {
+		cfg := &config.Config{JSONReport: true, ReportFile: t.TempDir()}
+		if err := outputReport(cfg, model.NewOnionScanReport("test.onion")); err == nil || !strings.Contains(err.Error(), "failed to create output file") {
+			t.Fatalf("expected output file error, got %v", err)
+		}
+	})
 }
 
 // TestSaveScanReport tests the saveScanReport function.
@@ -765,6 +864,21 @@ func TestSaveScanReport(t *testing.T) {
 			t.Error("expected SimpleReport to be initialized")
 		}
 	})
+
+	t.Run("returns database error", func(t *testing.T) {
+		t.Parallel()
+
+		db, err := database.Open(t.TempDir(), database.DefaultOptions())
+		if err != nil {
+			t.Fatalf("open database: %v", err)
+		}
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+		if err := saveScanReport(ctx, db, model.NewOnionScanReport("closed.onion"), logger); err == nil {
+			t.Fatal("expected database error")
+		}
+	})
 }
 
 // TestRunScanNoTargets tests that runScan returns error when no targets provided.
@@ -782,6 +896,144 @@ func TestRunScanNoTargets(t *testing.T) {
 	}
 	if err.Error() != "no targets provided (specify one or more onion addresses as arguments)" {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRunBatchScanWithUnavailableProxy(t *testing.T) {
+	t.Parallel()
+
+	const target = "p53lf57qovyuvwsc6xnrppyply3vtqm7l6pcobkmyqsiofyeznfu5uqd.onion"
+	client, err := tor.NewClient("127.0.0.1:1", 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("create Tor client: %v", err)
+	}
+
+	cfg := config.NewConfig()
+	cfg.Targets = []string{target, target}
+	cfg.BatchSize = 2
+	cfg.Timeout = 100 * time.Millisecond
+	cfg.CrawlDelay = 0
+	cfg.ReportFile = filepath.Join(t.TempDir(), "batch.json")
+	cfg.JSONReport = true
+	cfg.SiteConfigs = &config.File{
+		Defaults: config.SiteConfig{Depth: 1},
+		Sites: map[string]config.SiteConfig{
+			target: {Depth: 2},
+		},
+	}
+	logger := slog.New(slog.DiscardHandler)
+
+	if err := runBatchScan(context.Background(), cfg, client, nil, logger); err != nil {
+		t.Fatalf("batch scan failed: %v", err)
+	}
+	data, err := os.ReadFile(cfg.ReportFile)
+	if err != nil {
+		t.Fatalf("read batch report: %v", err)
+	}
+	var got model.OnionScanReport
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("decode batch report: %v", err)
+	}
+	if got.HiddenService != target {
+		t.Fatalf("hidden service = %q, want %q", got.HiddenService, target)
+	}
+}
+
+func TestCreatePipelineForTargetWithSiteOptions(t *testing.T) {
+	t.Parallel()
+
+	client, err := tor.NewClient("127.0.0.1:1", 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("create Tor client: %v", err)
+	}
+	cfg := config.NewConfig()
+	cfg.CrawlDepth = 1
+	cfg.MaxPages = 2
+	cfg.CrawlDelay = 0
+	site := config.SiteConfig{
+		Depth:          3,
+		Cookie:         "session=test",
+		Headers:        map[string]string{"X-Test": "true"},
+		IgnorePatterns: []string{"/private"},
+		FollowPatterns: []string{"/public"},
+	}
+	p := createPipelineForTarget(client, slog.Default(), cfg, site)
+	if p == nil || p.StepCount() != 4 {
+		t.Fatalf("unexpected pipeline: %#v", p)
+	}
+}
+
+func TestRunScanSetupErrors(t *testing.T) {
+	t.Parallel()
+
+	const target = "p53lf57qovyuvwsc6xnrppyply3vtqm7l6pcobkmyqsiofyeznfu5uqd.onion"
+	logger := slog.New(slog.DiscardHandler)
+
+	t.Run("database path is not a directory", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "file")
+		if err := os.WriteFile(path, []byte("not a directory"), 0o600); err != nil {
+			t.Fatalf("create file: %v", err)
+		}
+		cfg := config.NewConfig()
+		cfg.Targets = []string{target}
+		cfg.SaveToDB = true
+		cfg.DBDir = path
+		if err := runScan(context.Background(), cfg, logger); err == nil || !strings.Contains(err.Error(), "failed to open database") {
+			t.Fatalf("expected database error, got %v", err)
+		}
+	})
+
+	t.Run("external proxy address is invalid", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := config.NewConfig()
+		cfg.Targets = []string{target}
+		cfg.SaveToDB = false
+		cfg.UseExternalTor = true
+		cfg.TorProxyAddress = "invalid"
+		if err := runScan(context.Background(), cfg, logger); err == nil || !strings.Contains(err.Error(), "failed to create Tor client") {
+			t.Fatalf("expected Tor client error, got %v", err)
+		}
+	})
+}
+
+func TestRunSequentialScanErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	const target = "p53lf57qovyuvwsc6xnrppyply3vtqm7l6pcobkmyqsiofyeznfu5uqd.onion"
+	client, err := tor.NewClient("127.0.0.1:1", 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("create Tor client: %v", err)
+	}
+	logger := slog.New(slog.DiscardHandler)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := runSequentialScan(ctx, &config.Config{Targets: []string{target}}, client, nil, logger); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+
+	db, err := database.Open(t.TempDir(), database.DefaultOptions())
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close database: %v", err)
+	}
+	parentFile := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(parentFile, []byte("file"), 0o600); err != nil {
+		t.Fatalf("create parent file: %v", err)
+	}
+	cfg := config.NewConfig()
+	cfg.Targets = []string{target}
+	cfg.Timeout = 50 * time.Millisecond
+	cfg.CrawlDelay = 0
+	cfg.ReportFile = filepath.Join(parentFile, "report.json")
+	cfg.JSONReport = true
+	if err := runSequentialScan(context.Background(), cfg, client, db, logger); err != nil {
+		t.Fatalf("non-fatal output/database failures returned error: %v", err)
 	}
 }
 
@@ -819,11 +1071,11 @@ func TestRunScanWithContextCancellation(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	// This should fail early due to cancelled context or connection failure
+	// This should fail early due to canceled context or connection failure
 	err := runScan(ctx, cfg, logger)
 	// Either context.Canceled or connection error is acceptable
 	if err == nil {
-		t.Error("expected error due to cancelled context or connection failure")
+		t.Error("expected error due to canceled context or connection failure")
 	}
 }
 

@@ -296,7 +296,7 @@ func (s *HTTPScanner) analyzeHeaders(result *ScanResult) {
 				Severity:    model.SeverityLow,
 				Value:       server,
 				Location:    "Server Header",
-				Category:    "information-disclosure",
+				Category:    categoryInformationDisclosure,
 			})
 		}
 	}
@@ -309,7 +309,7 @@ func (s *HTTPScanner) analyzeHeaders(result *ScanResult) {
 			Severity:    model.SeverityLow,
 			Value:       poweredBy,
 			Location:    "X-Powered-By Header",
-			Category:    "information-disclosure",
+			Category:    categoryInformationDisclosure,
 		})
 	}
 
@@ -326,7 +326,7 @@ func (s *HTTPScanner) analyzeHeaders(result *ScanResult) {
 				Severity:    model.SeverityMedium,
 				Value:       etag,
 				Location:    "ETag Header",
-				Category:    "information-disclosure",
+				Category:    categoryInformationDisclosure,
 			})
 		}
 	}
@@ -429,8 +429,8 @@ func (s *HTTPScanner) checkSecurityHeaders(result *ScanResult) {
 			Title:       "Missing Content-Security-Policy Header",
 			Description: "No Content-Security-Policy header is set. CSP helps prevent XSS and data injection attacks.",
 			Severity:    model.SeverityInfo,
-			Location:    "HTTP Headers",
-			Category:    "security-headers",
+			Location:    locationHTTPHeaders,
+			Category:    categorySecurityHeaders,
 		})
 	}
 
@@ -440,8 +440,8 @@ func (s *HTTPScanner) checkSecurityHeaders(result *ScanResult) {
 			Title:       "Missing X-Frame-Options Header",
 			Description: "No X-Frame-Options header is set. This may allow clickjacking attacks.",
 			Severity:    model.SeverityInfo,
-			Location:    "HTTP Headers",
-			Category:    "security-headers",
+			Location:    locationHTTPHeaders,
+			Category:    categorySecurityHeaders,
 		})
 	}
 
@@ -451,8 +451,8 @@ func (s *HTTPScanner) checkSecurityHeaders(result *ScanResult) {
 			Title:       "Missing X-Content-Type-Options Header",
 			Description: "No X-Content-Type-Options header is set. This may allow MIME type sniffing.",
 			Severity:    model.SeverityInfo,
-			Location:    "HTTP Headers",
-			Category:    "security-headers",
+			Location:    locationHTTPHeaders,
+			Category:    categorySecurityHeaders,
 		})
 	}
 }

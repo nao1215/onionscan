@@ -2,10 +2,23 @@ package protocol
 
 import (
 	"context"
+	"errors"
+	"net"
 	"net/http"
 
 	"github.com/nao1215/onionscan/internal/model"
+	"golang.org/x/net/proxy"
 )
+
+const (
+	categoryDatabase              = "database"
+	categoryInformationDisclosure = "information-disclosure"
+	categorySecurityHeaders       = "security-headers"
+	locationHTTPHeaders           = "HTTP Headers"
+	locationSSHBanner             = "SSH Banner"
+)
+
+var errNilDialer = errors.New("protocol dialer must not be nil")
 
 // Scanner defines the interface for protocol-specific scanners.
 // Each protocol implementation must provide this interface to be used
@@ -147,6 +160,23 @@ type Finding struct {
 
 	// Category groups related findings (e.g., "email", "analytics").
 	Category string
+}
+
+// dialProxyWithContext establishes a connection through a context-aware proxy
+// dialer. Requiring DialContext prevents a canceled scan from retaining a
+// goroutine blocked in an unbounded legacy Dial call.
+func dialProxyWithContext(
+	ctx context.Context,
+	dialer proxy.ContextDialer,
+	address string,
+) (net.Conn, error) {
+	if dialer == nil {
+		return nil, errNilDialer
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return dialer.DialContext(ctx, "tcp", address)
 }
 
 // NewScanResult creates a new ScanResult with initialized maps.

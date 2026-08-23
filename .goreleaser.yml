@@ -1,3 +1,4 @@
+version: 2
 project_name: onionscan
 env:
   - GO111MODULE=on
@@ -7,7 +8,7 @@ before:
 builds:
   - main: ./cmd/onionscan
     ldflags:
-      - -s -w -X 'github.com/nao1215/onionscan/internal/config.Version=v{{ .Version }}'
+      - -s -w -X 'main.version=v{{ .Version }}' -X 'main.commit={{ .Commit }}' -X 'main.date={{ .Date }}'
     env:
       - CGO_ENABLED=0
     goos:
@@ -21,11 +22,11 @@ archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 checksum:
   name_template: "checksums.txt"
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:
@@ -41,7 +42,7 @@ nfpms:
       - deb
       - rpm
       - apk
-brews:
+homebrew_casks:
   - name: onionscan
     description: OnionScan - Security auditing tool for Tor hidden services (.onion addresses)
     license: MIT

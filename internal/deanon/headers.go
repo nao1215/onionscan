@@ -73,11 +73,9 @@ func (a *HeaderAnalyzer) Analyze(ctx context.Context, data *AnalysisData) ([]mod
 // ETags are HTTP caching headers that can be abused to track users
 // across sessions, similar to cookies but harder to clear.
 func (a *HeaderAnalyzer) checkETag(page *model.Page) []model.Finding {
-	findings := make([]model.Finding, 0)
-
 	etag := page.GetHeader("ETag")
 	if etag == "" {
-		return findings
+		return nil
 	}
 
 	// Long or unique ETags are more concerning
@@ -86,7 +84,7 @@ func (a *HeaderAnalyzer) checkETag(page *model.Page) []model.Finding {
 		severity = model.SeverityHigh
 	}
 
-	findings = append(findings, model.Finding{
+	return []model.Finding{{
 		Type:         "etag_tracking",
 		Title:        "ETag Tracking Risk",
 		Description:  "An ETag header was found that could be used to track users across sessions. ETags can function like supercookies, persisting even when cookies are cleared.",
@@ -94,9 +92,7 @@ func (a *HeaderAnalyzer) checkETag(page *model.Page) []model.Finding {
 		SeverityText: severity.String(),
 		Value:        etag,
 		Location:     page.URL,
-	})
-
-	return findings
+	}}
 }
 
 // checkCSP detects missing or weak Content-Security-Policy headers.

@@ -3,7 +3,6 @@ package protocol
 import (
 	"bufio"
 	"context"
-	"net"
 	"strings"
 	"time"
 
@@ -27,12 +26,12 @@ const (
 //  2. Default configurations often have no authentication
 //  3. Database banners reveal software versions
 type MongoDBScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewMongoDBScanner creates a new MongoDB scanner.
-func NewMongoDBScanner(dialer proxy.Dialer) *MongoDBScanner {
+func NewMongoDBScanner(dialer proxy.ContextDialer) *MongoDBScanner {
 	return &MongoDBScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,
@@ -59,7 +58,7 @@ func (s *MongoDBScanner) Scan(ctx context.Context, target string) (*ScanResult, 
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
-	conn, err := dialWithContext(ctx, s.dialer, host)
+	conn, err := dialProxyWithContext(ctx, s.dialer, host)
 	if err != nil {
 		return result, nil
 	}
@@ -72,7 +71,7 @@ func (s *MongoDBScanner) Scan(ctx context.Context, target string) (*ScanResult, 
 		Description: "A MongoDB server is listening on port 27017. Ensure authentication is enabled and access is restricted.",
 		Severity:    model.SeverityMedium,
 		Location:    "Port 27017",
-		Category:    "database",
+		Category:    categoryDatabase,
 	})
 
 	return result, nil
@@ -81,12 +80,12 @@ func (s *MongoDBScanner) Scan(ctx context.Context, target string) (*ScanResult, 
 // RedisScanner performs Redis scanning on onion services.
 // It connects to port 6379 to detect Redis servers.
 type RedisScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewRedisScanner creates a new Redis scanner.
-func NewRedisScanner(dialer proxy.Dialer) *RedisScanner {
+func NewRedisScanner(dialer proxy.ContextDialer) *RedisScanner {
 	return &RedisScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,
@@ -113,7 +112,7 @@ func (s *RedisScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
-	conn, err := dialWithContext(ctx, s.dialer, host)
+	conn, err := dialProxyWithContext(ctx, s.dialer, host)
 	if err != nil {
 		return result, nil
 	}
@@ -146,7 +145,7 @@ func (s *RedisScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 				Description: "Redis server responds to PING without authentication. This is a critical security issue as the database can be read and modified by anyone.",
 				Severity:    model.SeverityCritical,
 				Location:    "Port 6379",
-				Category:    "database",
+				Category:    categoryDatabase,
 			})
 		} else if strings.Contains(strings.ToUpper(response), "NOAUTH") ||
 			strings.Contains(strings.ToUpper(response), "ERR") {
@@ -155,7 +154,7 @@ func (s *RedisScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 				Description: "Redis server is running with authentication enabled.",
 				Severity:    model.SeverityInfo,
 				Location:    "Port 6379",
-				Category:    "database",
+				Category:    categoryDatabase,
 			})
 		}
 	}
@@ -166,12 +165,12 @@ func (s *RedisScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 // PostgreSQLScanner performs PostgreSQL scanning on onion services.
 // It connects to port 5432 to detect PostgreSQL servers.
 type PostgreSQLScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewPostgreSQLScanner creates a new PostgreSQL scanner.
-func NewPostgreSQLScanner(dialer proxy.Dialer) *PostgreSQLScanner {
+func NewPostgreSQLScanner(dialer proxy.ContextDialer) *PostgreSQLScanner {
 	return &PostgreSQLScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,
@@ -197,7 +196,7 @@ func (s *PostgreSQLScanner) Scan(ctx context.Context, target string) (*ScanResul
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
-	conn, err := dialWithContext(ctx, s.dialer, host)
+	conn, err := dialProxyWithContext(ctx, s.dialer, host)
 	if err != nil {
 		return result, nil
 	}
@@ -210,7 +209,7 @@ func (s *PostgreSQLScanner) Scan(ctx context.Context, target string) (*ScanResul
 		Description: "A PostgreSQL server is listening on port 5432. Ensure authentication is properly configured.",
 		Severity:    model.SeverityMedium,
 		Location:    "Port 5432",
-		Category:    "database",
+		Category:    categoryDatabase,
 	})
 
 	return result, nil
@@ -219,12 +218,12 @@ func (s *PostgreSQLScanner) Scan(ctx context.Context, target string) (*ScanResul
 // MySQLScanner performs MySQL scanning on onion services.
 // It connects to port 3306 to detect MySQL/MariaDB servers.
 type MySQLScanner struct {
-	dialer  proxy.Dialer
+	dialer  proxy.ContextDialer
 	timeout time.Duration
 }
 
 // NewMySQLScanner creates a new MySQL scanner.
-func NewMySQLScanner(dialer proxy.Dialer) *MySQLScanner {
+func NewMySQLScanner(dialer proxy.ContextDialer) *MySQLScanner {
 	return &MySQLScanner{
 		dialer:  dialer,
 		timeout: 30 * time.Second,
@@ -251,7 +250,7 @@ func (s *MySQLScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 
-	conn, err := dialWithContext(ctx, s.dialer, host)
+	conn, err := dialProxyWithContext(ctx, s.dialer, host)
 	if err != nil {
 		return result, nil
 	}
@@ -274,7 +273,7 @@ func (s *MySQLScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 			Description: "A MySQL or MariaDB server is listening on port 3306.",
 			Severity:    model.SeverityMedium,
 			Location:    "Port 3306",
-			Category:    "database",
+			Category:    categoryDatabase,
 		})
 		return result, nil
 	}
@@ -310,7 +309,7 @@ func (s *MySQLScanner) Scan(ctx context.Context, target string) (*ScanResult, er
 				Severity:    model.SeverityLow,
 				Value:       version,
 				Location:    "Port 3306 Handshake",
-				Category:    "database",
+				Category:    categoryDatabase,
 			})
 		}
 	}
@@ -354,27 +353,4 @@ func normalizeHost(target, defaultPort string) string {
 	}
 
 	return host
-}
-
-// dialWithContext dials a TCP connection respecting context cancellation.
-// This is a shared helper function for all protocol scanners.
-func dialWithContext(ctx context.Context, dialer proxy.Dialer, address string) (net.Conn, error) {
-	type dialResult struct {
-		conn net.Conn
-		err  error
-	}
-
-	resultCh := make(chan dialResult, 1)
-
-	go func() {
-		conn, err := dialer.Dial("tcp", address)
-		resultCh <- dialResult{conn, err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case result := <-resultCh:
-		return result.conn, result.err
-	}
 }

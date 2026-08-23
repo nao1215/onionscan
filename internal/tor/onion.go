@@ -1,11 +1,10 @@
 package tor
 
 import (
+	"crypto/sha3"
 	"encoding/base32"
 	"regexp"
 	"strings"
-
-	"golang.org/x/crypto/sha3"
 )
 
 // Onion address constants.
@@ -104,7 +103,7 @@ func IsValidV3Address(address string) bool {
 
 // computeV3Checksum computes the checksum bytes for a v3 onion address.
 // The checksum is the first 2 bytes of SHA3-256(".onion checksum" || pubkey || version).
-func computeV3Checksum(pubkey []byte, version byte) []byte {
+func computeV3Checksum(pubkey []byte, version byte) [2]byte {
 	// Construct the data to hash
 	data := make([]byte, 0, len(checksumPrefix)+len(pubkey)+1)
 	data = append(data, checksumPrefix...)
@@ -114,8 +113,8 @@ func computeV3Checksum(pubkey []byte, version byte) []byte {
 	// Compute SHA3-256 hash
 	hash := sha3.Sum256(data)
 
-	// Return first 2 bytes as checksum
-	return hash[:2]
+	// Return first 2 bytes as checksum.
+	return [2]byte{hash[0], hash[1]}
 }
 
 // IsV2Address checks if the given address matches the v2 onion address format.
@@ -284,7 +283,7 @@ func ComputeV3AddressFromPublicKey(pubkey []byte) (string, error) {
 	// Construct address data: pubkey (32) + checksum (2) + version (1)
 	addressData := make([]byte, 35)
 	copy(addressData[:32], pubkey)
-	copy(addressData[32:34], checksum)
+	copy(addressData[32:34], checksum[:])
 	addressData[34] = OnionV3Version
 
 	// Encode as base32 and add suffix

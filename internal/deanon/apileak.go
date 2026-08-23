@@ -8,6 +8,14 @@ import (
 	"github.com/nao1215/onionscan/internal/model"
 )
 
+const (
+	apiLeakCategoryDocumentation = "documentation"
+	apiLeakCategoryEndpoint      = "endpoint"
+	apiLeakCategoryDebug         = "debug"
+	apiLeakCategoryConfig        = "config"
+	apiLeakDatabaseURL           = "database_url"
+)
+
 // APILeakAnalyzer detects exposed API documentation, internal endpoints,
 // and development artifacts that could reveal information about the backend
 // infrastructure or provide unauthorized access.
@@ -42,21 +50,21 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "Swagger UI was found. This exposes the complete API structure and available endpoints.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)(?:swagger-ui|swaggerui)[^"']*\.(?:js|css|html)|swagger-ui-bundle`),
-				category:    "documentation",
+				category:    apiLeakCategoryDocumentation,
 			},
 			{
 				name:        "swagger_json",
 				description: "Swagger/OpenAPI JSON specification was found. This reveals all API endpoints and data models.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)(?:swagger|openapi)\.(?:json|yaml)|/api-docs(?:/|$)|/v\d+/api-docs`),
-				category:    "documentation",
+				category:    apiLeakCategoryDocumentation,
 			},
 			{
 				name:        "openapi_spec",
 				description: "OpenAPI specification detected. This documents the API structure.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)"openapi"\s*:\s*"[23]\.\d+\.\d+"|"swagger"\s*:\s*"2\.0"`),
-				category:    "documentation",
+				category:    apiLeakCategoryDocumentation,
 			},
 
 			// GraphQL
@@ -65,14 +73,14 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "GraphQL endpoint detected. May allow introspection queries revealing the schema.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)/graphql(?:/|$|\?)|graphql-playground|graphiql`),
-				category:    "endpoint",
+				category:    apiLeakCategoryEndpoint,
 			},
 			{
 				name:        "graphql_introspection",
 				description: "GraphQL introspection appears to be enabled. This exposes the entire schema.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)__schema|__type|introspectionquery`),
-				category:    "documentation",
+				category:    apiLeakCategoryDocumentation,
 			},
 
 			// API Documentation Tools
@@ -81,14 +89,14 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "ReDoc API documentation tool detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)redoc\.standalone|redoc-container`),
-				category:    "documentation",
+				category:    apiLeakCategoryDocumentation,
 			},
 			{
 				name:        "postman_collection",
 				description: "Postman collection reference found. May contain API credentials or internal endpoints.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)postman\.com/collections|\.postman_collection\.json`),
-				category:    "documentation",
+				category:    apiLeakCategoryDocumentation,
 			},
 
 			// Debug/Admin Endpoints
@@ -97,28 +105,28 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "Debug endpoint detected. May expose sensitive internal information.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)/debug(?:/|$)|/__debug__|/debug/pprof|/debug/vars`),
-				category:    "debug",
+				category:    apiLeakCategoryDebug,
 			},
 			{
 				name:        "admin_api",
 				description: "Admin API endpoint detected. May provide elevated access.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)/admin/api|/api/admin|/internal/api|/_internal/`),
-				category:    "endpoint",
+				category:    apiLeakCategoryEndpoint,
 			},
 			{
 				name:        "health_check",
 				description: "Health check endpoint exposed. May reveal infrastructure details.",
 				severity:    model.SeverityLow,
 				pattern:     regexp.MustCompile(`(?i)/health(?:check)?(?:/|$)|/ready(?:/|$)|/live(?:/|$)|/status(?:/|$)`),
-				category:    "endpoint",
+				category:    apiLeakCategoryEndpoint,
 			},
 			{
 				name:        "metrics_endpoint",
 				description: "Metrics endpoint detected (Prometheus/StatsD). Exposes operational data.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)/metrics(?:/|$)|/prometheus|# HELP .* # TYPE`),
-				category:    "debug",
+				category:    apiLeakCategoryDebug,
 			},
 
 			// Development Artifacts
@@ -127,21 +135,21 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "Environment file reference found. May contain secrets.",
 				severity:    model.SeverityCritical,
 				pattern:     regexp.MustCompile(`(?i)\.env(?:\.local|\.development|\.production)?(?:$|[^a-z])|dotenv`),
-				category:    "config",
+				category:    apiLeakCategoryConfig,
 			},
 			{
 				name:        "config_exposure",
 				description: "Configuration file exposure detected.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)config\.(?:json|yaml|yml|toml)|settings\.py|application\.properties`),
-				category:    "config",
+				category:    apiLeakCategoryConfig,
 			},
 			{
 				name:        "development_mode",
 				description: "Development mode indicators found. Service may have reduced security.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)(?:development|debug)\s*(?:mode|=\s*true)|NODE_ENV.*development|FLASK_DEBUG.*1`),
-				category:    "debug",
+				category:    apiLeakCategoryDebug,
 			},
 
 			// Internal API Patterns
@@ -150,14 +158,14 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "Internal API version detected. May indicate non-public endpoints.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)/api/v\d+/internal|/internal/v\d+|/_private/`),
-				category:    "endpoint",
+				category:    apiLeakCategoryEndpoint,
 			},
 			{
 				name:        "rpc_endpoint",
 				description: "RPC endpoint detected (gRPC/JSON-RPC).",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)/rpc(?:/|$)|grpc-web|json-rpc|jsonrpc`),
-				category:    "endpoint",
+				category:    apiLeakCategoryEndpoint,
 			},
 
 			// Framework-specific endpoints
@@ -166,28 +174,28 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "Django debug toolbar or settings detected.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)__debug__/|django-debug-toolbar|DEBUG\s*=\s*True`),
-				category:    "debug",
+				category:    apiLeakCategoryDebug,
 			},
 			{
 				name:        "flask_debug",
 				description: "Flask debugger detected. May allow code execution.",
 				severity:    model.SeverityCritical,
 				pattern:     regexp.MustCompile(`(?i)werkzeug.*debugger|Debugger PIN|The debugger caught an exception`),
-				category:    "debug",
+				category:    apiLeakCategoryDebug,
 			},
 			{
 				name:        "rails_routes",
 				description: "Rails routes or debug page detected.",
 				severity:    model.SeverityMedium,
 				pattern:     regexp.MustCompile(`(?i)rails/info/routes|action_dispatch|ActiveRecord`),
-				category:    "debug",
+				category:    apiLeakCategoryDebug,
 			},
 			{
 				name:        "laravel_debug",
 				description: "Laravel debug mode detected. May expose sensitive data.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)laravel.*exception|ignition-error|APP_DEBUG.*true`),
-				category:    "debug",
+				category:    apiLeakCategoryDebug,
 			},
 
 			// API Key/Token patterns in responses
@@ -196,23 +204,23 @@ func NewAPILeakAnalyzer() *APILeakAnalyzer {
 				description: "API key appears to be exposed in response.",
 				severity:    model.SeverityHigh,
 				pattern:     regexp.MustCompile(`(?i)"api[_-]?key"\s*:\s*"[a-zA-Z0-9_-]{20,}"`),
-				category:    "config",
+				category:    apiLeakCategoryConfig,
 			},
 			{
 				name:        "bearer_token_exposure",
 				description: "Bearer token appears to be exposed.",
 				severity:    model.SeverityCritical,
 				pattern:     regexp.MustCompile(`(?i)"(?:access_?token|bearer|jwt)"\s*:\s*"eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+"`),
-				category:    "config",
+				category:    apiLeakCategoryConfig,
 			},
 
 			// Database connection strings
 			{
-				name:        "database_url",
+				name:        apiLeakDatabaseURL,
 				description: "Database connection URL detected. May contain credentials.",
 				severity:    model.SeverityCritical,
 				pattern:     regexp.MustCompile(`(?i)(?:postgres|mysql|mongodb|redis)://[^@]+@[^/]+/\w+`),
-				category:    "config",
+				category:    apiLeakCategoryConfig,
 			},
 		},
 	}
@@ -280,7 +288,9 @@ func (a *APILeakAnalyzer) checkURL(url string) []model.Finding {
 
 	for _, p := range a.patterns {
 		// Only check URL-based patterns (endpoint, documentation, debug)
-		if p.category != "endpoint" && p.category != "documentation" && p.category != "debug" {
+		if p.category != apiLeakCategoryEndpoint &&
+			p.category != apiLeakCategoryDocumentation &&
+			p.category != apiLeakCategoryDebug {
 			continue
 		}
 		if p.pattern.MatchString(url) {
@@ -374,7 +384,7 @@ func (a *APILeakAnalyzer) sanitizeValue(value, patternName string) string {
 	}
 
 	// For database URLs, redact credentials
-	if patternName == "database_url" {
+	if patternName == apiLeakDatabaseURL {
 		// Replace password portion
 		re := regexp.MustCompile(`://([^:]+):([^@]+)@`)
 		value = re.ReplaceAllString(value, "://$1:[REDACTED]@")
@@ -393,7 +403,7 @@ func (a *APILeakAnalyzer) truncateValue(value string, maxLen int) string {
 
 // titleForPattern returns a human-readable title for a pattern type.
 func (a *APILeakAnalyzer) titleForPattern(patternName string) string {
-	titles := map[string]string{
+	titles := map[string]string{ //nolint:gosec // Map keys identify finding types; values are display titles, not credentials.
 		"swagger_ui":            "Swagger UI Exposed",
 		"swagger_json":          "Swagger/OpenAPI Specification Found",
 		"openapi_spec":          "OpenAPI Specification Detected",
@@ -416,7 +426,7 @@ func (a *APILeakAnalyzer) titleForPattern(patternName string) string {
 		"laravel_debug":         "Laravel Debug Mode Detected",
 		"api_key_exposure":      "API Key Exposed in Response",
 		"bearer_token_exposure": "Bearer Token Exposed",
-		"database_url":          "Database Connection URL Exposed",
+		apiLeakDatabaseURL:      "Database Connection URL Exposed",
 	}
 
 	if title, ok := titles[patternName]; ok {

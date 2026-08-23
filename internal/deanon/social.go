@@ -10,6 +10,12 @@ import (
 	"golang.org/x/text/language"
 )
 
+const (
+	socialTwitter   = "twitter"
+	socialFacebook  = "facebook"
+	socialInstagram = "instagram"
+)
+
 // SocialAnalyzer detects social media links and profiles.
 // Social media accounts are strong identity vectors that can link
 // a hidden service operator to their real identity.
@@ -42,7 +48,7 @@ type socialPattern struct {
 func NewSocialAnalyzer() *SocialAnalyzer {
 	return &SocialAnalyzer{
 		patterns: map[string]*socialPattern{
-			"twitter": {
+			socialTwitter: {
 				urlPatterns: []*regexp.Regexp{
 					regexp.MustCompile(`(?i)https?://(?:www\.)?(?:twitter\.com|x\.com)/([A-Za-z0-9_]{1,15})(?:/|$|\?)`),
 					regexp.MustCompile(`(?i)https?://(?:www\.)?(?:twitter\.com|x\.com)/([A-Za-z0-9_]{1,15})/status/\d+`),
@@ -51,7 +57,7 @@ func NewSocialAnalyzer() *SocialAnalyzer {
 				severity:      model.SeverityHigh,
 				description:   "A Twitter/X profile or post link was found. This is a strong identity vector.",
 			},
-			"facebook": {
+			socialFacebook: {
 				urlPatterns: []*regexp.Regexp{
 					regexp.MustCompile(`(?i)https?://(?:www\.)?facebook\.com/([A-Za-z0-9.]+)(?:/|$|\?)`),
 					regexp.MustCompile(`(?i)https?://(?:www\.)?fb\.com/([A-Za-z0-9.]+)(?:/|$|\?)`),
@@ -60,7 +66,7 @@ func NewSocialAnalyzer() *SocialAnalyzer {
 				severity:    model.SeverityHigh,
 				description: "A Facebook profile or page link was found. This is a strong identity vector.",
 			},
-			"instagram": {
+			socialInstagram: {
 				urlPatterns: []*regexp.Regexp{
 					regexp.MustCompile(`(?i)https?://(?:www\.)?instagram\.com/([A-Za-z0-9_.]+)(?:/|$|\?)`),
 					regexp.MustCompile(`(?i)https?://(?:www\.)?instagr\.am/([A-Za-z0-9_.]+)(?:/|$|\?)`),
@@ -247,7 +253,7 @@ func (a *SocialAnalyzer) searchPlatform(platform string, pattern *socialPattern,
 	}
 
 	// Search for @handles (Twitter specific)
-	if pattern.handlePattern != nil && platform == "twitter" {
+	if pattern.handlePattern != nil && platform == socialTwitter {
 		// Only look for handles in visible text areas, not in URLs
 		handles := pattern.handlePattern.FindAllStringSubmatch(content, -1)
 		seenHandles := make(map[string]bool)
@@ -301,8 +307,8 @@ func (a *SocialAnalyzer) isCommonWord(s string) bool {
 		"the": true, "and": true, "for": true, "are": true, "but": true,
 		"not": true, "you": true, "all": true, "can": true, "her": true,
 		"was": true, "one": true, "our": true, "out": true, "has": true,
-		"media": true, "here": true, "twitter": true, "facebook": true,
-		"instagram": true, "email": true, "contact": true, "admin": true,
+		"media": true, "here": true, socialTwitter: true, socialFacebook: true,
+		socialInstagram: true, analyzerTypeEmail: true, "contact": true, "admin": true,
 		"support": true, "info": true, "help": true, "null": true,
 		"undefined": true, "anonymous": true, "example": true,
 	}
@@ -312,22 +318,22 @@ func (a *SocialAnalyzer) isCommonWord(s string) bool {
 // titleForPlatform returns a display title for a platform.
 func (a *SocialAnalyzer) titleForPlatform(platform string) string {
 	titles := map[string]string{
-		"twitter":   "Twitter/X",
-		"facebook":  "Facebook",
-		"instagram": "Instagram",
-		"linkedin":  "LinkedIn",
-		"github":    "GitHub",
-		"youtube":   "YouTube",
-		"telegram":  "Telegram",
-		"discord":   "Discord",
-		"reddit":    "Reddit",
-		"tiktok":    "TikTok",
-		"mastodon":  "Mastodon",
-		"keybase":   "Keybase",
-		"signal":    "Signal",
-		"whatsapp":  "WhatsApp",
-		"patreon":   "Patreon",
-		"medium":    "Medium",
+		socialTwitter:   "Twitter/X",
+		socialFacebook:  "Facebook",
+		socialInstagram: "Instagram",
+		"linkedin":      "LinkedIn",
+		"github":        "GitHub",
+		"youtube":       "YouTube",
+		"telegram":      "Telegram",
+		"discord":       "Discord",
+		"reddit":        "Reddit",
+		"tiktok":        "TikTok",
+		"mastodon":      "Mastodon",
+		"keybase":       "Keybase",
+		"signal":        "Signal",
+		"whatsapp":      "WhatsApp",
+		"patreon":       "Patreon",
+		"medium":        "Medium",
 	}
 
 	if title, ok := titles[platform]; ok {

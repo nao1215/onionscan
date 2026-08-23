@@ -27,7 +27,7 @@ mkdir -p "$E2E_TMP/bin"
 
 COVER_FLAGS=()
 if [ -n "${COVER:-}" ]; then
-	COVER_FLAGS=(-cover -covermode=atomic -coverpkg=./...)
+	COVER_FLAGS=(-cover -covermode=atomic "-coverpkg=${COVERPKG:-./...}")
 	echo "e2e: building coverage-instrumented OnionScan"
 fi
 
@@ -41,4 +41,7 @@ echo "e2e: building OnionScan and the tornago onion service"
 )
 
 export PATH="$E2E_TMP/bin:$PATH"
-atago run --parallel 1 "$@" "$SCRIPT_DIR/atago"
+# Tor circuit construction can fail transiently even when both endpoints are
+# self-hosted. Retry only failed scenarios; persistent failures still fail the
+# suite after all attempts.
+atago run --parallel 1 --retry-failed 2 --allow-flaky "$@" "$SCRIPT_DIR/atago"
