@@ -326,10 +326,10 @@ func (c *Client) Dial(network, address string) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	conn, err := c.contextDialer.DialContext(ctx, network, address)
-	if err != nil && ctx.Err() != nil {
-		return nil, ctx.Err()
+	if normalizedErr := normalizeDialError(ctx, err); normalizedErr != nil {
+		return nil, normalizedErr
 	}
-	return conn, err
+	return conn, nil
 }
 
 // DialContext establishes a TCP connection through Tor with context support.
@@ -349,10 +349,28 @@ func (c *Client) DialContext(ctx context.Context, network, address string) (net.
 	dialCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	conn, err := c.contextDialer.DialContext(dialCtx, network, address)
-	if err != nil && dialCtx.Err() != nil {
-		return nil, dialCtx.Err()
+	if normalizedErr := normalizeDialError(dialCtx, err); normalizedErr != nil {
+		return nil, normalizedErr
 	}
-	return conn, err
+	return conn, nil
+}
+
+// normalizeDialError gives callers consistent context errors across platforms.
+// Some operating systems report the deadline applied by x/net/proxy as an
+// ordinary network timeout just before the context timer becomes observable.
+func normalizeDialError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
+
+	var networkErr net.Error
+	if _, hasDeadline := ctx.Deadline(); hasDeadline && errors.As(err, &networkErr) && networkErr.Timeout() {
+		return context.DeadlineExceeded
+	}
+	return err
 }
 
 // ProxyAddress returns the configured proxy address.
