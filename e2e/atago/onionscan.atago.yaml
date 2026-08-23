@@ -9,7 +9,7 @@ suite:
         command: onionscan-e2e-site --state ${suitedir}/site.json
         ready:
           file: ${suitedir}/site.json
-          timeout: 6m
+          timeout: 10m
     - store:
         name: onion_address
         from:

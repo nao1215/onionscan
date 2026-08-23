@@ -34,6 +34,8 @@ const testPage = `<!doctype html>
 </body>
 </html>`
 
+const hiddenServiceReadyTimeout = 8 * time.Minute
+
 type siteState struct {
 	OnionAddress string `json:"onion_address"`
 	OnionURL     string `json:"onion_url"`
@@ -184,7 +186,10 @@ func waitUntilReachable(ctx context.Context, state siteState) error {
 	httpClient := client.HTTPClient()
 	defer httpClient.CloseIdleConnections()
 
-	waitCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	// Publishing and fetching a fresh v3 descriptor can take several minutes on
+	// shared CI runners. Keep the service process alive long enough to ride out
+	// a slow Tor circuit while atago still enforces an outer setup deadline.
+	waitCtx, cancel := context.WithTimeout(ctx, hiddenServiceReadyTimeout)
 	defer cancel()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
