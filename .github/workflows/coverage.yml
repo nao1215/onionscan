@@ -7,16 +7,21 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  actions: write
+  pull-requests: write
+
 jobs:
-  integration_test:
-    name: Integration test with coverage (linux)
+  coverage:
+    name: Coverage (unit + atago E2E)
 
     strategy:
       matrix:
         platform: [ubuntu-latest]
 
     runs-on: ${{ matrix.platform }}
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - uses: actions/checkout@v7
@@ -31,7 +36,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tor
 
-      - name: Run integration tests with coverage
-        run: go test -cover -coverpkg=./... -coverprofile=coverage.out ./...
+      - name: Install atago
+        uses: nao1215/setup-atago@e4b6719aea547a68e6c15252222babab7f492a88 # v0.1.1
+        with:
+          version: v0.21.0
+
+      - name: Run combined unit and E2E coverage
+        run: make coverage
 
       - uses: k1LoW/octocov-action@v1
+        with:
+          config: .octocov.yml
+          work-dir: .
+          args: --report=coverage.out

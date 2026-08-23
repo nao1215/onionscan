@@ -28,6 +28,9 @@ func skipIfShort(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode (requires real Tor, takes 2-5 minutes)")
 	}
+	if os.Getenv("ONIONSCAN_RUN_TOR_INTEGRATION") != "1" {
+		t.Skip("skipping real Tor integration test; set ONIONSCAN_RUN_TOR_INTEGRATION=1 to run it")
+	}
 }
 
 // skipIfNoTor skips the test if the Tor binary is not available.
@@ -188,19 +191,7 @@ func startTestOnionServer(ctx context.Context, t *testing.T) *testOnionServer {
 
 	// Wait for the hidden service to be reachable
 	t.Log("Waiting for hidden service to be reachable...")
-	clientCfg, err := tornago.NewClientConfig(
-		tornago.WithClientSocksAddr(torProcess.SocksAddr()),
-		tornago.WithClientRequestTimeout(30*time.Second),
-	)
-	if err != nil {
-		controlClient.Close()
-		torProcess.Stop()
-		listener.Close()
-		server.Close()
-		t.Fatalf("failed to create client config: %v", err)
-	}
-
-	client, err := tornago.NewClient(clientCfg)
+	client, err := tor.NewClient(torProcess.SocksAddr(), 30*time.Second)
 	if err != nil {
 		controlClient.Close()
 		torProcess.Stop()
@@ -208,10 +199,9 @@ func startTestOnionServer(ctx context.Context, t *testing.T) *testOnionServer {
 		server.Close()
 		t.Fatalf("failed to create client: %v", err)
 	}
-	defer client.Close()
-
 	// Poll until the service is reachable (may take up to 2 minutes)
-	httpClient := client.HTTP()
+	httpClient := client.HTTPClient()
+	defer httpClient.CloseIdleConnections()
 	reachable := false
 	for i := range 24 { // 24 attempts, 5 seconds each = 2 minutes max
 		select {

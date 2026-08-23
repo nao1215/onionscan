@@ -36,6 +36,11 @@ type Client struct {
 	// We cache this to avoid recreating it for each connection.
 	dialer proxy.Dialer
 
+	// contextDialer is the context-aware form of dialer. Keeping this separately
+	// ensures cancellation interrupts both the TCP connection and the SOCKS5
+	// handshake instead of leaving a background dial blocked indefinitely.
+	contextDialer proxy.ContextDialer
+
 	// timeout is the default timeout for connections.
 	timeout time.Duration
 }
@@ -58,17 +63,25 @@ func NewClient(proxyAddress string, timeout time.Duration) (*Client, error) {
 		return nil, ErrInvalidProxyAddress
 	}
 
-	// Create the SOCKS5 dialer
-	// We use nil for auth because Tor's SOCKS port typically doesn't require auth
-	dialer, err := proxy.SOCKS5("tcp", proxyAddress, nil, proxy.Direct)
+	// Create the SOCKS5 dialer. A net.Dialer is used as the forward dialer so
+	// connecting to the proxy has the same upper bound as the rest of the
+	// request. x/net's SOCKS5 dialer also applies context deadlines to its
+	// handshake when the forward dialer supports DialContext.
+	forwardDialer := &net.Dialer{Timeout: timeout}
+	dialer, err := proxy.SOCKS5("tcp", proxyAddress, nil, forwardDialer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SOCKS5 dialer: %w", err)
 	}
+	contextDialer, ok := dialer.(proxy.ContextDialer)
+	if !ok {
+		return nil, errors.New("SOCKS5 dialer does not support context cancellation")
+	}
 
 	return &Client{
-		proxyAddress: proxyAddress,
-		dialer:       dialer,
-		timeout:      timeout,
+		proxyAddress:  proxyAddress,
+		dialer:        dialer,
+		contextDialer: contextDialer,
+		timeout:       timeout,
 	}, nil
 }
 
@@ -258,8 +271,8 @@ func (c *Client) NewHTTPClient() *http.Client {
 	// Create transport that routes through Tor
 	transport := &http.Transport{
 		// Use our SOCKS5 dialer for all connections
-		DialContext: func(_ context.Context, network, addr string) (net.Conn, error) {
-			return c.dialer.Dial(network, addr)
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return c.DialContext(ctx, network, addr)
 		},
 		// Disable TLS verification because hidden services typically use
 		// self-signed certificates. The .onion address itself provides
@@ -305,37 +318,59 @@ func (c *Client) NewHTTPClient() *http.Client {
 // The address should be in "host:port" format. For hidden services,
 // use the .onion address (e.g., "example.onion:22").
 func (c *Client) Dial(network, address string) (net.Conn, error) {
-	return c.dialer.Dial(network, address)
+	ctx := context.Background()
+	if c.timeout <= 0 {
+		return c.contextDialer.DialContext(ctx, network, address)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	conn, err := c.contextDialer.DialContext(ctx, network, address)
+	if normalizedErr := normalizeDialError(ctx, err); normalizedErr != nil {
+		return nil, normalizedErr
+	}
+	return conn, nil
 }
 
 // DialContext establishes a TCP connection through Tor with context support.
 // This allows for timeout and cancellation control.
 //
-// Design decision: We wrap the basic Dial with context support because
-// the proxy.Dialer interface doesn't support context directly. If the context
-// is cancelled, the goroutine returns the error but the underlying connection
-// attempt may continue briefly. This is a known limitation of the approach.
+// The configured client timeout is an upper bound even when the caller's
+// context has no deadline. If the caller supplies a shorter deadline, the
+// standard context rules preserve that shorter bound.
 func (c *Client) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	// Create channels for result and error
-	type dialResult struct {
-		conn net.Conn
-		err  error
+	if ctx == nil {
+		return nil, errors.New("dial context must not be nil")
 	}
-	resultCh := make(chan dialResult, 1)
-
-	// Dial in a goroutine so we can respect context cancellation
-	go func() {
-		conn, err := c.dialer.Dial(network, address)
-		resultCh <- dialResult{conn, err}
-	}()
-
-	// Wait for either the dial to complete or context cancellation
-	select {
-	case result := <-resultCh:
-		return result.conn, result.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	if c.timeout <= 0 {
+		return c.contextDialer.DialContext(ctx, network, address)
 	}
+
+	dialCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	conn, err := c.contextDialer.DialContext(dialCtx, network, address)
+	if normalizedErr := normalizeDialError(dialCtx, err); normalizedErr != nil {
+		return nil, normalizedErr
+	}
+	return conn, nil
+}
+
+// normalizeDialError gives callers consistent context errors across platforms.
+// Some operating systems report the deadline applied by x/net/proxy as an
+// ordinary network timeout just before the context timer becomes observable.
+func normalizeDialError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
+
+	var networkErr net.Error
+	if _, hasDeadline := ctx.Deadline(); hasDeadline && errors.As(err, &networkErr) && networkErr.Timeout() {
+		return context.DeadlineExceeded
+	}
+	return err
 }
 
 // ProxyAddress returns the configured proxy address.

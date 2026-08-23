@@ -32,4 +32,3 @@ jobs:
 
       - name: Run unit tests with coverage report output
         run: go test -short -cover -coverpkg=./... -coverprofile=coverage.out ./...
-

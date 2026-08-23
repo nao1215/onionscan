@@ -1,4 +1,4 @@
-.PHONY: build test test-short clean help tools changelog lint
+.PHONY: build test test-short test-integration e2e coverage clean help lint
 
 APP         = onionscan
 VERSION     = $(shell git describe --tags --abbrev=0)
@@ -23,15 +23,22 @@ build:  ## Build binary
 	env GO111MODULE=on GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO_BUILD) $(GO_LDFLAGS) -o $(APP) ./cmd/$(APP)
 
 clean: ## Clean project
-	-rm -rf $(APP) coverage*
+	-rm -rf $(APP) coverage* .coverage
 
-test: ## Run all tests including integration tests (may take 10+ minutes)
-	env GOOS=$(GOOS) $(GO_TEST) -cover -coverpkg=$(GO_PKGROOT) -coverprofile=coverage.out $(GO_PKGROOT)
+test: ## Run unit tests
+	env GOOS=$(GOOS) $(GO_TEST) -short -cover -coverpkg=$(GO_PKGROOT) -coverprofile=coverage.out $(GO_PKGROOT)
 	-$(GO_TOOL) cover -html=coverage.out -o coverage.html
 
-test-short: ## Run fast unit tests only (excludes integration tests)
-	env GOOS=$(GOOS) $(GO_TEST) -cover -coverpkg=$(GO_PKGROOT) -coverprofile=coverage.out -short $(GO_PKGROOT)
-	-$(GO_TOOL) cover -html=coverage.out -o coverage.html
+test-short: test ## Alias for test
+
+test-integration: ## Run the opt-in legacy real-Tor Go integration tests
+	env ONIONSCAN_RUN_TOR_INTEGRATION=1 $(GO_TEST) -timeout 45m ./cmd/onionscan
+
+e2e: ## Run atago E2E against a tornago-hosted onion service
+	./e2e/run.sh
+
+coverage: ## Combine unit and atago E2E coverage
+	./scripts/coverage.sh
 
 lint: ## Run golangci-lint
 	golangci-lint run

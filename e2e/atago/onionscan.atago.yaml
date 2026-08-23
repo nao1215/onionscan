@@ -1,0 +1,96 @@
+version: "1"
+
+suite:
+  name: OnionScan CLI with a self-hosted onion service
+  timeout: 3m
+  setup:
+    - service:
+        name: onion-site
+        command: onionscan-e2e-site --state ${suitedir}/site.json
+        ready:
+          file: ${suitedir}/site.json
+          timeout: 6m
+    - store:
+        name: onion_address
+        from:
+          file:
+            path: ${suitedir}/site.json
+            json:
+              path: "$.onion_address"
+    - store:
+        name: socks_address
+        from:
+          file:
+            path: ${suitedir}/site.json
+            json:
+              path: "$.socks_address"
+
+scenarios:
+  - name: version reports the real CLI build
+    steps:
+      - run:
+          command: onionscan version
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "onionscan version v0.0.0-e2e"
+              - "commit: e2e"
+
+  - name: init creates a private configuration template
+    steps:
+      - run:
+          command: onionscan init --output config/onionscan.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Created configuration file"
+      - assert:
+          file:
+            path: config/onionscan.yaml
+            contains:
+              - "defaults:"
+              - "sites:"
+      - assert:
+          file:
+            path: config/onionscan.yaml
+            executable: false
+
+  - name: scan and compare exercise the self-hosted onion service
+    env:
+      HOME: "${workdir}/home"
+      XDG_CONFIG_HOME: "${workdir}/home/.config"
+      XDG_DATA_HOME: "${workdir}/home/.local/share"
+    steps:
+      - run:
+          command: onionscan scan --external-tor ${socks_address} --timeout 20s --depth 2 --max-pages 5 --crawl-delay 0s --json --output first.json ${onion_address}
+          timeout: 3m
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: first.json
+            json:
+              - { path: "$.hidden_service", equals: "${onion_address}" }
+              - { path: "$.web_detected", equals: true }
+              - { path: "$.simple_report.pages_crawled", gt: 0 }
+              - { path: "$.timed_out", equals: false }
+      - assert:
+          file:
+            path: first.json
+            contains: "e2e@example.com"
+
+      - run:
+          command: onionscan scan --external-tor ${socks_address} --timeout 20s --depth 1 --max-pages 3 --crawl-delay 0s --json --output second.json ${onion_address}
+          timeout: 3m
+      - assert:
+          exit_code: 0
+
+      - run:
+          command: onionscan compare --json ${onion_address}
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - { path: "$.onion_service", equals: "${onion_address}" }
+              - { path: "$.risk_change.direction", equals: "unchanged" }
