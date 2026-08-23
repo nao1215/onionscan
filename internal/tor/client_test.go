@@ -3,6 +3,7 @@ package tor
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -661,6 +662,64 @@ func TestDialContext(t *testing.T) {
 		_, err := client.DialContext(ctx, "tcp", "example.onion:80")
 		if err == nil {
 			t.Log("DialContext succeeded (Tor proxy may be running)")
+		}
+	})
+
+	t.Run("cancels a stalled SOCKS5 handshake", func(t *testing.T) {
+		t.Parallel()
+
+		listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to create listener: %v", err)
+		}
+		defer listener.Close()
+
+		serverDone := make(chan struct{})
+		go func() {
+			defer close(serverDone)
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+			defer conn.Close()
+
+			greeting := make([]byte, 3)
+			if _, readErr := io.ReadFull(conn, greeting); readErr != nil {
+				return
+			}
+			if _, writeErr := conn.Write([]byte{0x05, 0x00}); writeErr != nil {
+				return
+			}
+
+			// Read the CONNECT request, then intentionally omit the reply. A
+			// context-aware SOCKS5 handshake must still return and close conn.
+			request := make([]byte, 4+1+len("example.onion")+2)
+			_, _ = io.ReadFull(conn, request)
+			oneByte := make([]byte, 1)
+			_, _ = conn.Read(oneByte)
+		}()
+
+		client, err := NewClient(listener.Addr().String(), 5*time.Second)
+		if err != nil {
+			t.Fatalf("failed to create client: %v", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		started := time.Now()
+		_, err = client.DialContext(ctx, "tcp", "example.onion:80")
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected context deadline exceeded, got %v", err)
+		}
+		if elapsed := time.Since(started); elapsed > time.Second {
+			t.Fatalf("stalled handshake ignored cancellation for %v", elapsed)
+		}
+
+		select {
+		case <-serverDone:
+		case <-time.After(time.Second):
+			t.Fatal("SOCKS5 connection remained open after cancellation")
 		}
 	})
 }
