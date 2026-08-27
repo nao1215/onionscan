@@ -64,6 +64,14 @@ choco install tor
 brew install nao1215/tap/onionscan
 ```
 
+### Arch Linux (AUR)
+
+```shell
+yay -S onionscan-bin   # or: paru -S onionscan-bin
+```
+
+[`onionscan-bin`](https://aur.archlinux.org/packages/onionscan-bin) is community-maintained and installs the release binary.
+
 ### Go
 
 ```shell
