@@ -6,7 +6,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/dsoprea/go-exif/v3 v3.0.1
 	github.com/nao1215/markdown v1.0.0
-	github.com/nao1215/tornago v0.4.0
+	github.com/nao1215/tornago v0.4.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.58.0
 	golang.org/x/sync v0.22.0
