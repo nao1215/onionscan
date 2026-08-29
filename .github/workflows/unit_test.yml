@@ -17,8 +17,17 @@ jobs:
           - "ubuntu-latest"
           - "windows-latest"
           - "macos-latest"
+        # The floor go.mod declares and the newest release. Running the floor
+        # here is the only place that go.mod claim is checked; before this there
+        # was only the floor, so nothing caught a new Go release breaking the
+        # tree. "stable" tracks each release without an edit, and is used rather
+        # than "1" because setup-go resolves "1" from its own manifest, which
+        # lags a fresh release. Every other workflow uses "stable" too: go.mod
+        # states the oldest Go a user may build from, not the toolchain CI
+        # should ship release artifacts with.
         go:
           - "1.25"
+          - "stable"
       fail-fast: false
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
