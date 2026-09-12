@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.3 - 2026-09-12
+
 ### Changed
 
 - Dependencies updated (`github.com/nao1215/tornago` 0.4.0 to 0.4.1, `modernc.org/sqlite` 1.56.0 to 1.57.0, `github.com/golang/geo`, `github.com/go-errors/errors`, `github.com/fatih/color`, `github.com/spf13/pflag` and the tablewriter chain), holding `modernc.org/libc` at the version `modernc.org/sqlite` declares. The `go` directive stays at 1.25.0.
