@@ -6,6 +6,12 @@
 
 - Dependencies updated (`github.com/nao1215/tornago` 0.4.0 to 0.4.1, `modernc.org/sqlite` 1.56.0 to 1.57.0, `github.com/golang/geo`, `github.com/go-errors/errors`, `github.com/fatih/color`, `github.com/spf13/pflag` and the tablewriter chain), holding `modernc.org/libc` at the version `modernc.org/sqlite` declares. The `go` directive stays at 1.25.0.
 - The unit-test matrix runs the newest Go release alongside the go.mod floor, and the coverage and release jobs build with the current stable toolchain instead of the floor.
+- Dependencies updated again on 2026-09-12: `modernc.org/sqlite` 1.58.0, `modernc.org/libc` 1.75.7, `github.com/mattn/go-runewidth` 0.0.30, `github.com/stretchr/testify` 1.12.1 and `github.com/jessevdk/go-flags` 1.6.1. The golang.org/x bumps are not taken: that family now declares `go 1.26.0`, and the floor here is 1.25.0.
+- The E2E suite runs with atago v0.22.0. The five scenarios were run locally against a tornago-hosted onion service before the pin moved.
+
+### Removed
+
+- The Go Report Card badge. The service is retired and its badge now answers `go report: retired`, which is a line of README saying nothing about this repository.
 
 ## v0.2.2 - 2026-08-23
 
