@@ -1,4 +1,4 @@
-.PHONY: build test test-short test-integration e2e coverage clean help lint
+.PHONY: build test test-short test-integration e2e coverage clean help lint bench bench-compare
 
 APP         = onionscan
 VERSION     = $(shell git describe --tags --abbrev=0)
@@ -42,6 +42,12 @@ coverage: ## Combine unit and atago E2E coverage
 
 lint: ## Run golangci-lint
 	golangci-lint run
+
+bench: ## Measure onionscan with the himorime suite in bench/ (requires himorime on PATH)
+	himorime run bench
+
+bench-compare: ## Compare main with the working tree on the himorime suite (BASE=main)
+	himorime compare --against $${BASE:-main} bench
 
 .DEFAULT_GOAL := help
 help: ## Show help message
