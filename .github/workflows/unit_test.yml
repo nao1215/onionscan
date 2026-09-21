@@ -26,7 +26,7 @@ jobs:
         # states the oldest Go a user may build from, not the toolchain CI
         # should ship release artifacts with.
         go:
-          - "1.25"
+          - "1.26"
           - "stable"
       fail-fast: false
     runs-on: ${{ matrix.os }}

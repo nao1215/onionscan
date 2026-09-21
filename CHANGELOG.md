@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Building from source now needs Go 1.26 or later (was 1.25). golang.org/x/net, x/sync and x/text, which this update takes, declare `go 1.26.0`, and Go 1.26 and 1.27 are the two releases the Go team still supports. Prebuilt binaries are unaffected.
+
 ## v0.2.3 - 2026-09-12
 
 ### Changed
