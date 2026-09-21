@@ -18,9 +18,8 @@
 # (${head_root}), so they read the same data.
 version: "1"
 
-suite:
-  name: onionscan
-  description: Start-up, comparing two stored scans of 10 and 100 000 findings in each report format, and the error paths of compare and scan.
+name: onionscan
+description: Start-up, comparing two stored scans of 10 and 100 000 findings in each report format, and the error paths of compare and scan.
 
 build:
   command: [go, build, -trimpath, -o, "${artifact}", ./cmd/onionscan]
@@ -46,10 +45,10 @@ defaults:
     latency:
       max_percent: 10
       min_difference: 1ms
-    cpu:
+    cpu_total:
       max_percent: 15
       min_difference: 2ms
-    memory:
+    peak_rss:
       max_percent: 15
       min_difference: 2MiB
 
