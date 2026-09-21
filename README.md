@@ -33,7 +33,7 @@ The crawler supports configurable depth, page limits, delays, response-size limi
 
 ## Requirements
 
-- Go 1.25 or later when building from source
+- Go 1.26 or later when building from source
 - A `tor` executable on `PATH`
 
 Install Tor with the package manager for your platform:
