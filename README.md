@@ -89,6 +89,40 @@ go build -o onionscan ./cmd/onionscan
 
 Release archives are available from the [GitHub Releases page](https://github.com/nao1215/onionscan/releases).
 
+## Verifying release integrity
+
+Releases after v0.2.4 ship supply-chain metadata so you can verify what you download:
+
+- Signed checksums: `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless), producing `checksums.txt.sigstore.json`.
+- SBOM: an SPDX Software Bill of Materials is attached to each release archive as `<archive>.sbom.json`.
+- Build provenance: SLSA build provenance is attested via GitHub OIDC, and is also attached to the release as `multiple.intoto.jsonl`.
+
+Verify the signed checksums (then check your archive against `checksums.txt`):
+
+```shell
+cosign verify-blob \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-identity-regexp 'https://github.com/nao1215/onionscan/\.github/workflows/release\.yml@refs/tags/.*' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  checksums.txt
+sha256sum --check --ignore-missing checksums.txt
+```
+
+Verify the build provenance of a downloaded artifact with the GitHub CLI:
+
+```shell
+gh attestation verify onionscan_<version>_<os>_<arch>.tar.gz --repo nao1215/onionscan
+```
+
+Or download the `multiple.intoto.jsonl` release asset and verify the archive against it with [slsa-verifier](https://github.com/slsa-framework/slsa-verifier), which checks the provenance signature against the Sigstore transparency log:
+
+```shell
+slsa-verifier verify-artifact onionscan_<version>_<os>_<arch>.tar.gz \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/nao1215/onionscan \
+  --source-tag v<version>
+```
+
 ## Quick start
 
 Scan one service with an automatically managed Tor process:
