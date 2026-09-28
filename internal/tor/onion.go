@@ -162,10 +162,13 @@ func ExtractV3Addresses(content string) []string {
 func ExtractV2Addresses(content string) []string {
 	content = strings.ToLower(content)
 
-	// First, find all v3 addresses to exclude their substrings
-	v3Addresses := make(map[string]bool)
-	for _, v3 := range onionV3ContentPattern.FindAllString(content, -1) {
-		v3Addresses[v3] = true
+	// First, record where every v3 address ends. A v2 match that ends at the
+	// same position is the tail of that v3 address, not a separate address.
+	// Positions are used instead of the address text so that each occurrence
+	// of a repeated v3 address is excluded, not only the first one.
+	v3Ends := make(map[int]bool)
+	for _, idx := range onionV3ContentPattern.FindAllStringIndex(content, -1) {
+		v3Ends[idx[1]] = true
 	}
 
 	matches := onionV2ContentPattern.FindAllStringIndex(content, -1)
@@ -175,26 +178,10 @@ func ExtractV2Addresses(content string) []string {
 	var result []string
 
 	for _, matchIdx := range matches {
-		match := content[matchIdx[0]:matchIdx[1]]
-
-		// Skip if this match is part of a v3 address
-		// Check if there's a v3 address that ends at the same position
-		isPartOfV3 := false
-		for v3Addr := range v3Addresses {
-			// Check if the v2 match is a suffix of this v3 address
-			if strings.HasSuffix(v3Addr, match) {
-				// Verify the positions overlap
-				v3Start := strings.Index(content, v3Addr)
-				if v3Start != -1 && v3Start+len(v3Addr) == matchIdx[1] {
-					isPartOfV3 = true
-					break
-				}
-			}
-		}
-
-		if isPartOfV3 {
+		if v3Ends[matchIdx[1]] {
 			continue
 		}
+		match := content[matchIdx[0]:matchIdx[1]]
 
 		if !seen[match] {
 			seen[match] = true

@@ -1,7 +1,9 @@
 package tor
 
 import (
+	"encoding/base32"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -227,6 +229,11 @@ func TestExtractV2Addresses(t *testing.T) {
 			name:          "duplicate v2 addresses should be deduplicated",
 			content:       "facebookcorewwwi.onion and facebookcorewwwi.onion",
 			expectedCount: 1,
+		},
+		{
+			name:          "repeated v3 address should not leak its tail as a v2 address",
+			content:       testOnionV3Addr1 + " and again " + testOnionV3Addr1,
+			expectedCount: 0,
 		},
 	}
 
@@ -480,4 +487,178 @@ func TestOnionError(t *testing.T) {
 			t.Errorf("expected 'interface test', got %q", err.Error())
 		}
 	})
+}
+
+// FuzzNormalizeAddress checks the address normalizer that every scan and
+// compare target passes through. Whatever the input, a successful result must
+// be a canonical v3 address: it passes checksum validation, normalizing it again
+// is a no-op, and it can be rebuilt from the public key it encodes.
+func FuzzNormalizeAddress(f *testing.F) {
+	for _, seed := range []string{
+		testOnionV3Addr1,
+		testOnionV3Addr2,
+		strings.ToUpper(testOnionV3Addr1),
+		strings.TrimSuffix(testOnionV3Addr2, OnionSuffix),
+		"  http://" + testOnionV3Addr1 + "/path?q=1#frag  ",
+		"https://" + testOnionV3Addr2 + ":8080",
+		"facebookcorewwwi.onion",
+		"http://facebookcorewwwi.onion/",
+		strings.Repeat("a", 56) + ".onion",
+		"",
+		" ",
+		".onion",
+		"http://",
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, input string) {
+		got, err := NormalizeAddress(input)
+		if err != nil {
+			if !errors.Is(err, ErrInvalidOnionAddress) && !errors.Is(err, ErrV2AddressDeprecated) {
+				t.Fatalf("NormalizeAddress(%q) returned unexpected error %v", input, err)
+			}
+			if IsValidV3Address(input) {
+				t.Fatalf("NormalizeAddress(%q) rejected an address that IsValidV3Address accepts: %v", input, err)
+			}
+			return
+		}
+
+		if !IsValidV3Address(got) {
+			t.Fatalf("NormalizeAddress(%q) = %q, which IsValidV3Address rejects", input, got)
+		}
+		if len(got) != OnionV3TotalLength || got != strings.ToLower(got) {
+			t.Fatalf("NormalizeAddress(%q) = %q, want %d lowercase bytes", input, got, OnionV3TotalLength)
+		}
+		if IsValidV3Address(input) && got != strings.ToLower(input) {
+			t.Fatalf("NormalizeAddress(%q) = %q, want the lowercased input", input, got)
+		}
+
+		again, err := NormalizeAddress(got)
+		if err != nil || again != got {
+			t.Fatalf("NormalizeAddress is not idempotent: %q -> %q -> (%q, %v)", input, got, again, err)
+		}
+
+		decoded, err := base32.StdEncoding.DecodeString(strings.ToUpper(strings.TrimSuffix(got, OnionSuffix)))
+		if err != nil {
+			t.Fatalf("normalized address %q is not base32: %v", got, err)
+		}
+		rebuilt, err := ComputeV3AddressFromPublicKey(decoded[:32])
+		if err != nil || rebuilt != got {
+			t.Fatalf("address %q rebuilt from its public key as (%q, %v)", got, rebuilt, err)
+		}
+	})
+}
+
+// FuzzComputeV3AddressFromPublicKey drives the encoder with arbitrary keys and
+// checks that every address it produces is accepted by the validator, survives
+// normalization of a URL form, and is extracted from text as exactly one v3
+// address and no v2 address, even when the text repeats it.
+func FuzzComputeV3AddressFromPublicKey(f *testing.F) {
+	f.Add(make([]byte, 32))
+	sequential := make([]byte, 32)
+	for i := range sequential {
+		sequential[i] = byte(i)
+	}
+	f.Add(sequential)
+	f.Add([]byte{})
+	f.Add(make([]byte, 31))
+	f.Add(make([]byte, 33))
+
+	f.Fuzz(func(t *testing.T, pubkey []byte) {
+		addr, err := ComputeV3AddressFromPublicKey(pubkey)
+		if len(pubkey) != 32 {
+			if err == nil {
+				t.Fatalf("ComputeV3AddressFromPublicKey accepted a %d-byte key and returned %q", len(pubkey), addr)
+			}
+			return
+		}
+		if err != nil {
+			t.Fatalf("ComputeV3AddressFromPublicKey(%x) returned error %v", pubkey, err)
+		}
+
+		if !IsValidV3Address(addr) {
+			t.Fatalf("IsValidV3Address rejects computed address %q", addr)
+		}
+
+		url := "  HTTP://" + strings.ToUpper(addr) + "/index.html?x=1#top "
+		if got, err := NormalizeAddress(url); err != nil || got != addr {
+			t.Fatalf("NormalizeAddress(%q) = (%q, %v), want %q", url, got, err, addr)
+		}
+
+		text := "see " + addr + " and " + strings.ToUpper(addr) + "\n" + addr
+		if got := ExtractV3Addresses(text); len(got) != 1 || got[0] != addr {
+			t.Fatalf("ExtractV3Addresses(%q) = %q, want [%q]", text, got, addr)
+		}
+		if got := ExtractV2Addresses(text); len(got) != 0 {
+			t.Fatalf("ExtractV2Addresses(%q) = %q, want none", text, got)
+		}
+	})
+}
+
+// FuzzExtractAddresses feeds arbitrary page text to the v2 and v3 extractors.
+// Every result must match the address format and occur in the lowercased text,
+// results must be unique, and repeating the text must not change the set of
+// addresses found.
+func FuzzExtractAddresses(f *testing.F) {
+	for _, seed := range []string{
+		"Visit us at " + testOnionV3Addr1,
+		"Link1: " + testOnionV3Addr1 + " Link2: " + testOnionV3Addr2,
+		"Old: facebookcorewwwi.onion New: " + strings.ToUpper(testOnionV3Addr1),
+		"<a href=\"http://" + testOnionV3Addr2 + "/\">x</a>",
+		strings.Repeat("a", 72) + ".onion",
+		"",
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, content string) {
+		lowered := strings.ToLower(content)
+		v3 := ExtractV3Addresses(content)
+		v2 := ExtractV2Addresses(content)
+
+		checkExtracted(t, "v3", v3, onionV3Pattern, lowered)
+		checkExtracted(t, "v2", v2, onionV2Pattern, lowered)
+
+		doubled := content + "\n" + content
+		if got := ExtractV3Addresses(doubled); !sameSet(got, v3) {
+			t.Fatalf("ExtractV3Addresses changed when the text was repeated: %q vs %q", got, v3)
+		}
+		if got := ExtractV2Addresses(doubled); !sameSet(got, v2) {
+			t.Fatalf("ExtractV2Addresses changed when the text was repeated: %q vs %q", got, v2)
+		}
+	})
+}
+
+func checkExtracted(t *testing.T, kind string, got []string, pattern *regexp.Regexp, lowered string) {
+	t.Helper()
+	seen := make(map[string]bool, len(got))
+	for _, addr := range got {
+		if !pattern.MatchString(addr) {
+			t.Fatalf("%s extractor returned malformed address %q", kind, addr)
+		}
+		if !strings.Contains(lowered, addr) {
+			t.Fatalf("%s extractor returned %q, which is not in the text", kind, addr)
+		}
+		if seen[addr] {
+			t.Fatalf("%s extractor returned %q twice", kind, addr)
+		}
+		seen[addr] = true
+	}
+}
+
+func sameSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	set := make(map[string]bool, len(a))
+	for _, s := range a {
+		set[s] = true
+	}
+	for _, s := range b {
+		if !set[s] {
+			return false
+		}
+	}
+	return true
 }
