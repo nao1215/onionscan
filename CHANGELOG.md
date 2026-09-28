@@ -5,6 +5,7 @@
 ### Changed
 
 - Releases are signed and ship with SLSA build provenance. `checksums.txt` is signed with cosign (keyless), producing `checksums.txt.sigstore.json`, and SLSA build provenance is attached as `multiple.intoto.jsonl`, which `slsa-verifier verify-artifact` checks against a downloaded archive. The release run verifies every published archive against it before finishing.
+- Building from source now needs Go 1.26.6 or later (was 1.26.0). Earlier 1.26 patch releases have standard library advisories that this program reaches, in `net/http`, `net/url`, `crypto/tls` and `encoding/asn1`; the new govulncheck workflow scans the floor and the newest Go every day. Prebuilt binaries are unaffected.
 
 ### Fixed
 
