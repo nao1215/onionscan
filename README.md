@@ -91,7 +91,7 @@ Release archives are available from the [GitHub Releases page](https://github.co
 
 ## Verifying release integrity
 
-Releases after v0.2.4 ship supply-chain metadata so you can verify what you download:
+Releases from v0.2.5 on ship supply-chain metadata so you can verify what you download:
 
 - Signed checksums: `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless), producing `checksums.txt.sigstore.json`.
 - SBOM: an SPDX Software Bill of Materials is attached to each release archive as `<archive>.sbom.json`.

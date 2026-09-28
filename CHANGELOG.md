@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.5 - 2026-09-28
+
 ### Changed
 
 - Releases are signed and ship with SLSA build provenance. `checksums.txt` is signed with cosign (keyless), producing `checksums.txt.sigstore.json`, and SLSA build provenance is attached as `multiple.intoto.jsonl`, which `slsa-verifier verify-artifact` checks against a downloaded archive. The release run verifies every published archive against it before finishing.
