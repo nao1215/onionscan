@@ -237,19 +237,19 @@ func (a *ExternalLinkAnalyzer) analyzeCSP(page *model.Page, seen map[string]bool
 	return findings
 }
 
-// extractDomain extracts the domain from a URL.
+// extractDomain extracts the lower-cased host name from a URL.
+//
+// The port, IPv6 brackets and the trailing dot of a fully qualified name are
+// dropped so that "http://x.onion:8080/" and "http://x.onion./" are still
+// recognised as onion links, and so that every port of one clearnet host is
+// reported as a single domain. It returns "" for relative URLs.
 func (a *ExternalLinkAnalyzer) extractDomain(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return ""
 	}
 
-	// Skip relative URLs
-	if u.Host == "" {
-		return ""
-	}
-
-	return strings.ToLower(u.Host)
+	return strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
 }
 
 // assessLinkSeverity determines the severity of a clearnet link.
