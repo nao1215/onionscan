@@ -5,6 +5,7 @@
 [![measured with himorime](https://img.shields.io/badge/measured%20with-himorime-d9480f)](https://github.com/nao1215/himorime)
 ![GitHub license](https://img.shields.io/github/license/nao1215/onionscan)
 [![GitHub downloads](https://img.shields.io/github/downloads/nao1215/onionscan/total)](https://github.com/nao1215/onionscan/releases)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/nao1215/onionscan/badge)](https://scorecard.dev/viewer/?uri=github.com/nao1215/onionscan)
 
 # OnionScan
 
