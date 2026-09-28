@@ -1,6 +1,6 @@
 module github.com/nao1215/onionscan
 
-go 1.26.0
+go 1.26.6
 
 require (
 	github.com/adrg/xdg v0.5.3
