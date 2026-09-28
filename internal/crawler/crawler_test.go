@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -1152,6 +1153,30 @@ func TestResolveURLEdgeCases(t *testing.T) {
 			t.Error("expected link with trimmed whitespace to be parsed")
 		}
 	})
+
+	t.Run("drops links whose resolved form does not parse", func(t *testing.T) {
+		t.Parallel()
+
+		// net/url accepts "//0::" as a relative reference but rejects the
+		// resolved "http://0::", so the link could never be classified.
+		html := `<html><body><a href="//0::">Bad host</a><a href="/ok">OK</a></body></html>`
+		parser, err := NewParser("http://test.onion/")
+		if err != nil {
+			t.Fatalf("failed to create parser: %v", err)
+		}
+
+		result, err := parser.Parse(strings.NewReader(html))
+		if err != nil {
+			t.Fatalf("failed to parse: %v", err)
+		}
+
+		if len(result.Links) != 1 || result.Links[0] != "http://test.onion/ok" {
+			t.Errorf("expected only http://test.onion/ok, got %q", result.Links)
+		}
+		if len(result.InternalLinks) != 1 {
+			t.Errorf("expected 1 internal link, got %q", result.InternalLinks)
+		}
+	})
 }
 
 // TestClassifyLinkEdgeCases tests edge cases in link classification.
@@ -1216,6 +1241,25 @@ func TestClassifyLinkEdgeCases(t *testing.T) {
 
 		if len(result.ExternalLinks) != 1 {
 			t.Errorf("expected 1 external link, got %d", len(result.ExternalLinks))
+		}
+	})
+
+	t.Run("classifies uppercase external onion links as onion, not clearnet", func(t *testing.T) {
+		t.Parallel()
+
+		html := `<html><body><a href="http://OTHER.ONION/page">External Onion</a></body></html>`
+		parser, err := NewParser("http://test.onion/")
+		if err != nil {
+			t.Fatalf("failed to create parser: %v", err)
+		}
+
+		result, err := parser.Parse(strings.NewReader(html))
+		if err != nil {
+			t.Fatalf("failed to parse: %v", err)
+		}
+
+		if len(result.ExternalLinks) != 1 || len(result.ClearnetLinks) != 0 {
+			t.Errorf("expected 1 external and 0 clearnet links, got external=%q clearnet=%q", result.ExternalLinks, result.ClearnetLinks)
 		}
 	})
 }
@@ -1305,5 +1349,91 @@ func TestMatchPatternEdgeCases(t *testing.T) {
 				t.Errorf("matchPattern(%q, %q) = %v, want %v", tt.pattern, tt.path, result, tt.expected)
 			}
 		})
+	}
+}
+
+// FuzzParserParse feeds arbitrary HTML, as served by the crawled onion service,
+// to the page parser. Parsing must not panic, every resolved link must land in
+// exactly one of the internal, external and clearnet buckets, the onion and
+// clearnet buckets must agree with the link's host, and the extracted emails
+// and onion addresses must be lowercase and unique.
+func FuzzParserParse(f *testing.F) {
+	for _, seed := range []string{
+		`<html><head><title>Test Page</title></head><body></body></html>`,
+		`<a href="/internal">a</a><a href="http://test.onion/same">b</a><a href="http://other.onion/x">c</a><a href="http://example.com/">d</a>`,
+		`<a href="http://OTHER.ONION/page">upper</a><a href="HTTP://Example.COM">mixed</a>`,
+		`<a href="javascript:alert(1)">js</a><a href="mailto:a@b.c">m</a><a href="#">h</a><a href=" //evil.example ">p</a>`,
+		`<form action="/login" method="post"><input name="user"><select name="s"></select><textarea name="t"></textarea></form>`,
+		`<script src="http://cdn.example/x.js"></script><img src="/a.png"><link rel="icon" href="/f.ico">`,
+		`<meta name="author" content="x"><meta property="og:title" content="y">`,
+		`<!-- admin@Example.com facebookcorewwwi.onion --><p>Contact: USER@EXAMPLE.COM</p>`,
+		`<a href="http://[::1]:80/">ipv6</a><a href="http://%zz/">bad</a><a href="http://a b/">space</a>`,
+		`<title>`,
+		``,
+	} {
+		f.Add(seed)
+	}
+
+	parser, err := NewParser("http://test.onion/page")
+	if err != nil {
+		f.Fatalf("failed to create parser: %v", err)
+	}
+
+	f.Fuzz(func(t *testing.T, body string) {
+		result, err := parser.Parse(strings.NewReader(body))
+		if err != nil {
+			return
+		}
+
+		classified := len(result.InternalLinks) + len(result.ExternalLinks) + len(result.ClearnetLinks)
+		if classified != len(result.Links) {
+			t.Fatalf("%d links but %d classified: internal=%q external=%q clearnet=%q",
+				len(result.Links), classified, result.InternalLinks, result.ExternalLinks, result.ClearnetLinks)
+		}
+		for _, link := range result.ExternalLinks {
+			if !hasOnionHost(link) {
+				t.Fatalf("external link %q does not point to an onion host", link)
+			}
+		}
+		for _, link := range result.ClearnetLinks {
+			if hasOnionHost(link) {
+				t.Fatalf("clearnet link %q points to an onion host", link)
+			}
+		}
+
+		assertLowerUnique(t, "email", result.Emails)
+		assertLowerUnique(t, "onion address", result.OnionAddresses)
+		for _, addr := range result.OnionAddresses {
+			if !strings.HasSuffix(addr, ".onion") {
+				t.Fatalf("onion address %q lacks the .onion suffix", addr)
+			}
+		}
+		for _, form := range result.Forms {
+			if form.Method == "" || form.Method != strings.ToUpper(form.Method) {
+				t.Fatalf("form method %q is not a non-empty uppercase method", form.Method)
+			}
+		}
+	})
+}
+
+func hasOnionHost(link string) bool {
+	u, err := url.Parse(link)
+	if err != nil {
+		return false
+	}
+	return strings.HasSuffix(strings.ToLower(u.Hostname()), ".onion")
+}
+
+func assertLowerUnique(t *testing.T, kind string, values []string) {
+	t.Helper()
+	seen := make(map[string]bool, len(values))
+	for _, v := range values {
+		if v != strings.ToLower(v) {
+			t.Fatalf("%s %q is not lowercase", kind, v)
+		}
+		if seen[v] {
+			t.Fatalf("%s %q is reported twice", kind, v)
+		}
+		seen[v] = true
 	}
 }

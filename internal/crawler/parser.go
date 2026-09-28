@@ -286,8 +286,15 @@ func (p *Parser) resolveURL(href string) string {
 		return ""
 	}
 
-	resolved := p.baseURL.ResolveReference(u)
-	return resolved.String()
+	resolved := p.baseURL.ResolveReference(u).String()
+
+	// net/url accepts some relative references (for example "//0::") whose
+	// resolved form it then refuses to parse. Drop those so that every link we
+	// report can be classified and fetched.
+	if _, err := url.Parse(resolved); err != nil {
+		return ""
+	}
+	return resolved
 }
 
 // classifyLink categorizes a link as internal, external, or clearnet.
@@ -307,8 +314,9 @@ func (p *Parser) classifyLink(link string, result *ParseResult) {
 		return
 	}
 
-	// Check if it's an onion address
-	if strings.HasSuffix(host, ".onion") {
+	// Check if it's an onion address. Host names are case-insensitive, so
+	// "OTHER.ONION" is an onion service just like "other.onion".
+	if strings.HasSuffix(strings.ToLower(host), ".onion") {
 		// Different onion service
 		result.ExternalLinks = append(result.ExternalLinks, link)
 	} else if host != "" {
