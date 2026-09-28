@@ -1965,10 +1965,19 @@ func TestExternalLinkAnalyzerExtractDomain(t *testing.T) {
 	}{
 		{"extracts domain from https URL", "https://example.com/path", "example.com"},
 		{"extracts domain from http URL", "http://test.org/page?query=1", "test.org"},
-		{"handles URL with port", "https://example.com:8080/path", "example.com:8080"},
+		{"drops the port", "https://example.com:8080/path", "example.com"},
 		{"returns empty for invalid URL", "not-a-valid-url", ""},
 		{"returns empty for relative URL", "/path/to/file", ""},
 		{"handles subdomain", "https://sub.example.com/", "sub.example.com"},
+		{"drops the port of an onion host", "http://other.onion:8080/", "other.onion"},
+		{"lowercases an upper-case onion host", "http://OTHER.ONION/", "other.onion"},
+		{"drops userinfo", "http://user:pass@example.com/", "example.com"},
+		{"drops userinfo and port of an onion host", "http://user@other.onion:80/", "other.onion"},
+		{"strips brackets from an IPv6 literal", "http://[2001:db8::1]/", "2001:db8::1"},
+		{"strips brackets and port from an IPv6 literal", "http://[2001:db8::1]:8080/", "2001:db8::1"},
+		{"strips the trailing dot of a fully qualified onion host", "http://other.onion./", "other.onion"},
+		{"handles a protocol-relative onion URL with port", "//other.onion:8080/x", "other.onion"},
+		{"returns empty for a URL with only a port", "http://:8080/", ""},
 	}
 
 	analyzer := NewExternalLinkAnalyzer()
@@ -1983,6 +1992,113 @@ func TestExternalLinkAnalyzerExtractDomain(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestExternalLinkAnalyzerOnionHostVariants checks that onion links are never
+// reported as clearnet resources just because the URL carries a port,
+// userinfo, upper-case letters or a trailing dot, and that clearnet links
+// with those decorations are reported under their bare host name.
+func TestExternalLinkAnalyzerOnionHostVariants(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		url  string
+		// want is the finding value expected for an anchor, or "" when the
+		// link must not produce any finding.
+		want string
+	}{
+		{"onion with port", "http://other.onion:8080/page", ""},
+		{"onion with default port", "http://other.onion:80/", ""},
+		{"upper-case onion", "http://OTHER.ONION/page", ""},
+		{"upper-case onion with port", "https://Other.Onion:443/", ""},
+		{"onion with userinfo", "http://user:pass@other.onion/", ""},
+		{"onion with userinfo and port", "http://user@other.onion:8080/", ""},
+		{"fully qualified onion", "http://other.onion./", ""},
+		{"protocol-relative onion with port", "//other.onion:8080/x", ""},
+		{"clearnet with port", "http://example.com:8080/page", "example.com"},
+		{"clearnet with userinfo", "http://user:pass@example.com/", "example.com"},
+		{"IPv6 literal", "http://[2001:db8::1]/", "2001:db8::1"},
+		{"IPv6 literal with port", "http://[2001:db8::1]:8080/", "2001:db8::1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			data := &AnalysisData{
+				HiddenService: "test.onion",
+				Pages: []*model.Page{
+					{
+						URL:     "http://test.onion/",
+						Anchors: []model.Element{{Source: tt.url}},
+						Scripts: []model.Element{{Source: tt.url}},
+						Images:  []model.Element{{Source: tt.url}},
+					},
+				},
+				Report: model.NewOnionScanReport("test.onion"),
+			}
+
+			findings, err := NewExternalLinkAnalyzer().Analyze(context.Background(), data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.want == "" {
+				for _, f := range findings {
+					t.Errorf("unexpected %s finding for %q: value %q", f.Type, tt.url, f.Value)
+				}
+				if got := data.Report.AnonymityReport.RelatedClearnetDomains; len(got) != 0 {
+					t.Errorf("related clearnet domains = %v, want none", got)
+				}
+				return
+			}
+
+			types := make(map[string]bool)
+			for _, f := range findings {
+				types[f.Type] = true
+				if f.Type == "clearnet_link" && f.Value != tt.want {
+					t.Errorf("clearnet_link value = %q, want %q", f.Value, tt.want)
+				}
+			}
+			for _, typ := range []string{"clearnet_link", "external_script", "external_image"} {
+				if !types[typ] {
+					t.Errorf("missing %s finding for %q", typ, tt.url)
+				}
+			}
+			got := data.Report.AnonymityReport.RelatedClearnetDomains
+			if len(got) != 1 || got[0] != tt.want {
+				t.Errorf("related clearnet domains = %v, want [%s]", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("port variants of one clearnet host are reported once", func(t *testing.T) {
+		t.Parallel()
+
+		data := &AnalysisData{
+			HiddenService: "test.onion",
+			Pages: []*model.Page{
+				{
+					URL: "http://test.onion/",
+					Anchors: []model.Element{
+						{Source: "http://example.com/"},
+						{Source: "http://example.com:8080/"},
+						{Source: "https://EXAMPLE.com:443/"},
+					},
+				},
+			},
+			Report: model.NewOnionScanReport("test.onion"),
+		}
+
+		findings, err := NewExternalLinkAnalyzer().Analyze(context.Background(), data)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(findings) != 1 {
+			t.Errorf("got %d findings, want 1: %+v", len(findings), findings)
+		}
+	})
 }
 
 // TestServerInfoAnalyzerHeaders tests various header detection.

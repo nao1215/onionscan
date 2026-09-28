@@ -5,6 +5,7 @@
 ### Fixed
 
 - Internal parsers found by the new fuzz tests: the v2 address extractor no longer reports the last 16 characters of a v3 address as a deprecated v2 address when the v3 address appears more than once, the HTML parser classifies links to upper-case `.ONION` hosts as onion links instead of clearnet links, and it drops hrefs such as `//0::` whose resolved URL cannot be parsed instead of reporting them as unclassified links. None of these reached scan reports.
+- Links, scripts and images pointing at another onion service with an explicit port (`http://x.onion:8080/`) or a trailing dot (`http://x.onion./`) are no longer reported as `clearnet_link`, `external_script` or `external_image` findings or listed as related clearnet domains. Clearnet domains are now reported without their port and IPv6 brackets, so `example.com` and `example.com:8080` count as one domain.
 
 ## v0.2.4 - 2026-09-21
 
