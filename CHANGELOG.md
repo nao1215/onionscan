@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Releases are signed and ship with SLSA build provenance. `checksums.txt` is signed with cosign (keyless), producing `checksums.txt.sigstore.json`, and SLSA build provenance is attached as `multiple.intoto.jsonl`, which `slsa-verifier verify-artifact` checks against a downloaded archive. The release run verifies every published archive against it before finishing.
+
 ### Fixed
 
 - Internal parsers found by the new fuzz tests: the v2 address extractor no longer reports the last 16 characters of a v3 address as a deprecated v2 address when the v3 address appears more than once, the HTML parser classifies links to upper-case `.ONION` hosts as onion links instead of clearnet links, and it drops hrefs such as `//0::` whose resolved URL cannot be parsed instead of reporting them as unclassified links. None of these reached scan reports.
