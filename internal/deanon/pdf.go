@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -139,26 +138,7 @@ func (a *PDFAnalyzer) extractPDFURLs(page *model.Page) []string {
 // isAllowedURL checks if fetching the URL is allowed based on same-origin policy.
 // Only .onion URLs from the target host are allowed by default.
 func (a *PDFAnalyzer) isAllowedURL(pdfURL string) bool {
-	parsed, err := url.Parse(pdfURL)
-	if err != nil {
-		return false
-	}
-
-	host := parsed.Hostname()
-
-	// Always allow same-origin requests to target .onion
-	if host == a.targetHost {
-		return true
-	}
-
-	// Check if it's a .onion URL (other onion services)
-	if strings.HasSuffix(host, ".onion") {
-		// Allow other .onion URLs only if external fetch is enabled
-		return a.allowExternalFetch
-	}
-
-	// Clearnet URLs are never allowed (would leak IP)
-	return false
+	return isAllowedFetchURL(pdfURL, a.targetHost, a.allowExternalFetch)
 }
 
 // analyzePDF downloads and analyzes a PDF file.
