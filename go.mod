@@ -9,7 +9,7 @@ require (
 	github.com/nao1215/tornago v0.4.3
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/net v0.60.0
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.42.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.60.1
