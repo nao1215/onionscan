@@ -1,6 +1,6 @@
 module github.com/nao1215/onionscan
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/adrg/xdg v0.5.3
@@ -42,7 +42,7 @@ require (
 	github.com/stretchr/testify v1.12.1 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	modernc.org/libc v1.77.1 // indirect
+	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
