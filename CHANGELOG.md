@@ -4,8 +4,10 @@
 
 ### Changed
 
-- Building from source now needs Go 1.26.9 or later (was 1.26.6). Go 1.26.9 fixes standard library advisories in `net/http`, `net/textproto` and `crypto/tls` that this program reaches (GO-2026-6607, GO-2026-6608, GO-2026-6617 and others). Prebuilt binaries are unaffected.
+- Building from source now needs Go 1.26.10 or later (was 1.26.6). Go 1.26.9 fixes standard library advisories in `net/http`, `net/textproto` and `crypto/tls` that this program reaches (GO-2026-6607, GO-2026-6608, GO-2026-6617 and others), and Go 1.26.10 adds the `crypto/x509` intermediate-certificate denylist (GO-2026-6809). Prebuilt binaries are unaffected.
 - Updated dependencies, including `golang.org/x/net` v0.60.0 for GO-2026-6617, `modernc.org/sqlite` v1.60.1, `github.com/nao1215/tornago` v0.4.3 and `github.com/nao1215/markdown` v1.1.1.
+- Release archives and Linux packages now include the license texts of the linked dependencies under THIRD_PARTY_LICENSES/. CI checks dependency licenses on Linux, Windows, and macOS.
+- Dependencies: modernc.org/libc v1.79.0.
 
 ## v0.2.5 - 2026-09-28
 
