@@ -33,3 +33,4 @@ go.work.sum
 # .vscode/
 /onionscan
 dist
+/third_party_licenses/
