@@ -8,7 +8,7 @@ require (
 	github.com/nao1215/markdown v1.1.1
 	github.com/nao1215/tornago v0.4.3
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
