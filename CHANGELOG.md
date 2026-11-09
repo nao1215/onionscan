@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.2.6 - 2026-11-09
+
 ### Changed
 
 - Building from source now needs Go 1.26.10 or later (was 1.26.6). Go 1.26.9 fixes standard library advisories in `net/http`, `net/textproto` and `crypto/tls` that this program reaches (GO-2026-6607, GO-2026-6608, GO-2026-6617 and others), and Go 1.26.10 adds the `crypto/x509` intermediate-certificate denylist (GO-2026-6809). Prebuilt binaries are unaffected.
