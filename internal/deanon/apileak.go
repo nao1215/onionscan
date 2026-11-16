@@ -403,7 +403,7 @@ func (a *APILeakAnalyzer) truncateValue(value string, maxLen int) string {
 
 // titleForPattern returns a human-readable title for a pattern type.
 func (a *APILeakAnalyzer) titleForPattern(patternName string) string {
-	titles := map[string]string{ //nolint:gosec // Map keys identify finding types; values are display titles, not credentials.
+	titles := map[string]string{ // #nosec G101 -- Map keys identify finding types; values are display titles, not credentials.
 		"swagger_ui":            "Swagger UI Exposed",
 		"swagger_json":          "Swagger/OpenAPI Specification Found",
 		"openapi_spec":          "OpenAPI Specification Detected",

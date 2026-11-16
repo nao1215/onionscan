@@ -279,7 +279,7 @@ func (c *Client) NewHTTPClient() *http.Client {
 		// self-signed certificates. The .onion address itself provides
 		// authentication via the onion service protocol.
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // Required for .onion services
+			InsecureSkipVerify: true, // #nosec G402 -- Required for .onion services
 		},
 		// Connection pool settings
 		// We use smaller values than defaults because each connection goes
