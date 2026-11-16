@@ -19,7 +19,7 @@ var ErrConfigNotFound = errors.New("configuration file not found")
 // Callers should handle this error appropriately based on whether
 // the config file path was explicitly specified by the user.
 func LoadConfigFile(path string) (*File, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // User-provided config path is intentional
+	data, err := os.ReadFile(path) // #nosec G304 -- User-provided config path is intentional
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, ErrConfigNotFound
