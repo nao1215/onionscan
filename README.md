@@ -259,31 +259,16 @@ Report files are created with owner-only permissions because they can contain se
 
 ## Testing
 
-Run the fast Go test suite:
+| Technique | Bug class caught here |
+|---|---|
+| [Unit tests](internal) | Wrong results of each package on Linux, macOS and Windows |
+| [End-to-end tests](e2e/atago/onionscan.atago.yaml) | Broken scans, reports and history of the real `onionscan` binary against a self-hosted onion service |
+| [Property-based tests](cmd/onionscan/compare_property_test.go) | Comparisons that misplace findings, and [secrets that reach the log](internal/log/secure_handler_property_test.go) through an unlisted path |
+| [Metamorphic tests](cmd/onionscan/compare_property_test.go) | Comparisons that disagree with the same comparison taken the other way round |
+| [Fuzzing](internal/tor/onion_test.go) | Panics and wrong verdicts on malformed onion addresses and HTML |
+| [Benchmarks](bench) | Slower start-up and `compare` on large scan histories |
 
-```shell
-make test
-```
-
-Run the real CLI through [atago](https://github.com/nao1215/atago):
-
-```shell
-make e2e
-```
-
-The E2E suite builds a local HTTP fixture, exposes it as an ephemeral Tor v3 onion service with [tornago](https://github.com/nao1215/tornago), and points OnionScan at the fixture's own SOCKS5 proxy. It does not depend on a public onion site. The suite checks version output, configuration generation, JSON scanning, database persistence, and comparison behavior.
-
-Generate one coverage profile from both Go unit tests and the atago-driven CLI runs:
-
-```shell
-make coverage
-```
-
-The command writes `coverage.out` and `coverage.html`. Real-Tor Go integration tests retained for focused debugging are opt-in:
-
-```shell
-make test-integration
-```
+The commands, files and CI jobs for each are in [doc/testing.md](doc/testing.md).
 
 ## Troubleshooting
 

@@ -34,3 +34,6 @@ go.work.sum
 /onionscan
 dist
 /third_party_licenses/
+
+# rapid writes a failing case here; reproduce it with the printed seed instead
+testdata/rapid/
