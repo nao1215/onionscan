@@ -60,6 +60,17 @@ go test ./cmd/onionscan ./internal/log -run '^TestProperty' -rapid.checks=100000
 go test -run '^$' -fuzz '^FuzzNormalizeAddress$' -fuzztime 1m ./internal/tor
 ```
 
+## Mutation testing
+
+[gremlins](https://github.com/go-gremlins/gremlins) v0.6.0 changes one expression at a time and reruns the tests; a mutant that no test notices (lived) points at code whose result nothing checks. `.github/workflows/mutation.yml` mutates the whole module every Sunday and, on a pull request, only the lines it changes. Each mutant runs under a 4 GiB memory cap so a mutant that allocates without bound is killed instead of taking the runner down.
+
+```shell
+ulimit -v 4194304
+gremlins unleash --workers 2 --timeout-coefficient 30 .
+```
+
+Baseline, 2026-11-19, the whole module: 756 killed, 170 lived, 139 not covered, test efficacy (killed / (killed + lived)) 81.64%, mutator coverage 86.95%. The most lived mutants are in `internal/report/markdown.go`, `internal/pipeline/steps.go`, `internal/deanon/pdf.go`, `internal/deanon/social.go` and `internal/crawler/spider.go`. The score is a record to compare later runs with, not a gate: some lived mutants are equivalent to the original code.
+
 ## Benchmarks
 
 ```shell

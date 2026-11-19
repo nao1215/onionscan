@@ -267,6 +267,7 @@ Report files are created with owner-only permissions because they can contain se
 | [Property-based tests](cmd/onionscan/compare_property_test.go) | Comparisons that misplace findings, and [secrets that reach the log](internal/log/secure_handler_property_test.go) through an unlisted path |
 | [Metamorphic tests](cmd/onionscan/compare_property_test.go) | Comparisons that disagree with the same comparison taken the other way round |
 | [Fuzzing](internal/tor/onion_test.go) | Panics and wrong verdicts on malformed onion addresses and HTML |
+| [Mutation testing](.github/workflows/mutation.yml) | Tests that run changed code without checking its result |
 | [Benchmarks](bench) | Slower start-up and `compare` on large scan histories |
 
 The commands, files and CI jobs for each are in [doc/testing.md](doc/testing.md).
