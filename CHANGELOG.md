@@ -6,6 +6,8 @@
 
 - CI scans the repository with gosec and Trivy on every pull request (Trivy covers dependency vulnerabilities, committed secrets and misconfigurations, and also runs daily). Workflow actions are recorded in `.github/workflows/actions.lock`, which CI verifies against the pinned commits.
 - Building from source now needs Go 1.26.11 or later (was 1.26.10). Go 1.26.11 fixes the `net/http` advisory GO-2026-6859, which govulncheck finds reachable from onionscan on the earlier patch.
+- Updated dependencies: `golang.org/x/net` v0.63.0, `golang.org/x/text` v0.44.0, `golang.org/x/sync` v0.25.0, `modernc.org/sqlite` v1.62.0 and `github.com/nao1215/markdown` v1.1.2. `github.com/spf13/pflag` stays at v1.0.10 because v1.1.0 prints every boolean flag as `--flag[=true|false]` in the help text.
+- CI scans pull requests and pushes to main for committed secrets with gitleaks, and runs the E2E suite with atago v0.26.3 and the benchmarks with himorime v0.6.1.
 
 ## v0.2.6 - 2026-11-09
 

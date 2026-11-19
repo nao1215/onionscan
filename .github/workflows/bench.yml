@@ -22,6 +22,10 @@ jobs:
   bench:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # setup-himorime posts the problems it finds as a PR comment.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -31,9 +35,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: nao1215/setup-himorime@14aeeb3fe55ad42cf29ee0802d578820faac3897 # v0.1.2
+      - uses: nao1215/setup-himorime@05b4d293796e34a46c59f1363e15841a18e83e92 # v0.2.1
         with:
-          version: v0.5.2
+          version: v0.6.1
       - name: Compare the base with the head
         if: github.event_name == 'pull_request'
         run: himorime ci --output "$RUNNER_TEMP/himorime.json" --format json bench
