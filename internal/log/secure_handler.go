@@ -142,6 +142,11 @@ func (h *SecureHandler) WithGroup(name string) slog.Handler {
 
 // sanitizeAttr sanitizes a single attribute, recursively handling groups.
 func (h *SecureHandler) sanitizeAttr(a slog.Attr) slog.Attr {
+	// A slog.LogValuer hides its value until it is resolved, and the
+	// underlying handler would resolve it after this check. Resolve it first
+	// so a group or string behind it is sanitized like any other.
+	a.Value = a.Value.Resolve()
+
 	// Handle groups recursively
 	if a.Value.Kind() == slog.KindGroup {
 		attrs := a.Value.Group()
