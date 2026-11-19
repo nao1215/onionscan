@@ -9,6 +9,10 @@
 - Updated dependencies: `golang.org/x/net` v0.63.0, `golang.org/x/text` v0.44.0, `golang.org/x/sync` v0.25.0, `modernc.org/sqlite` v1.62.0 and `github.com/nao1215/markdown` v1.1.2. `github.com/spf13/pflag` stays at v1.0.10 because v1.1.0 prints every boolean flag as `--flag[=true|false]` in the help text.
 - CI scans pull requests and pushes to main for committed secrets with gitleaks (runs started by Dependabot are skipped), and runs the E2E suite with atago v0.26.3 and the benchmarks with himorime v0.6.1.
 
+### Fixed
+
+- `onionscan compare` lists new and resolved findings in the order the scans reported them. Before, the order changed from one run to the next on the same scan history, so two runs of the same comparison printed different text, JSON and Markdown.
+
 ## v0.2.6 - 2026-11-09
 
 ### Changed
