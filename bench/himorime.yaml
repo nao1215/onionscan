@@ -85,25 +85,55 @@ benchmarks:
       markdown:
         command: ["${artifact}", compare, --markdown, n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion]
 
-  - name: compare 100k
+  - name: compare 100k text
     description: >-
       The two latest scans of a service with 100 000 findings each (one in
       ten new, one in ten resolved): reading and decoding both reports from
-      SQLite, matching the findings, and writing each format.
+      SQLite, matching the findings, and writing text. Each format is its own
+      benchmark so CI can measure the three on separate runners.
     tags: [large]
     setup:
       - command: [sh, "${head_root}/gen.sh", db, "100000", "${workdir}/data/onionscan"]
         env: *goenv
-    baseline: text
     metrics:
       throughput:
         work: {value: 200000, unit: findings}
     commands:
-      text:
+      onionscan:
         command: ["${artifact}", compare, n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion]
-      json:
+
+  - name: compare 100k json
+    description: >-
+      The two latest scans of a service with 100 000 findings each (one in
+      ten new, one in ten resolved): reading and decoding both reports from
+      SQLite, matching the findings, and writing JSON. Each format is its own
+      benchmark so CI can measure the three on separate runners.
+    tags: [large]
+    setup:
+      - command: [sh, "${head_root}/gen.sh", db, "100000", "${workdir}/data/onionscan"]
+        env: *goenv
+    metrics:
+      throughput:
+        work: {value: 200000, unit: findings}
+    commands:
+      onionscan:
         command: ["${artifact}", compare, --json, n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion]
-      markdown:
+
+  - name: compare 100k markdown
+    description: >-
+      The two latest scans of a service with 100 000 findings each (one in
+      ten new, one in ten resolved): reading and decoding both reports from
+      SQLite, matching the findings, and writing Markdown. Each format is its own
+      benchmark so CI can measure the three on separate runners.
+    tags: [large]
+    setup:
+      - command: [sh, "${head_root}/gen.sh", db, "100000", "${workdir}/data/onionscan"]
+        env: *goenv
+    metrics:
+      throughput:
+        work: {value: 200000, unit: findings}
+    commands:
+      onionscan:
         command: ["${artifact}", compare, --markdown, n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion]
 
   - name: compare error
