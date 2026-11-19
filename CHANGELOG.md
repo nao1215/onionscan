@@ -13,6 +13,7 @@
 
 - `onionscan compare` lists new and resolved findings in the order the scans reported them. Before, the order changed from one run to the next on the same scan history, so two runs of the same comparison printed different text, JSON and Markdown.
 - `onionscan compare` no longer treats two different findings as the same one when a value or location contains `|`. The finding's type, value and location were joined with `|` to match findings across scans, so a finding with value `a|b` at `c` and one with value `a` at `b|c` were counted as unchanged instead of resolved and new.
+- The secure logger now redacts values behind a `slog.LogValuer`. It checked an attribute before the value was resolved, so a type that logs itself as a group with a `password` field, or as a bearer-token string, was written to the verbose log in clear.
 
 ## v0.2.6 - 2026-11-09
 
