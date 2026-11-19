@@ -5,14 +5,14 @@ go 1.26.11
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/dsoprea/go-exif/v3 v3.0.1
-	github.com/nao1215/markdown v1.1.1
+	github.com/nao1215/markdown v1.1.2
 	github.com/nao1215/tornago v0.4.3
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/net v0.62.0
-	golang.org/x/sync v0.24.0
-	golang.org/x/text v0.43.0
+	golang.org/x/net v0.63.0
+	golang.org/x/sync v0.25.0
+	golang.org/x/text v0.44.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.61.1
+	modernc.org/sqlite v1.62.0
 )
 
 require (
@@ -24,8 +24,8 @@ require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
-	github.com/goccy/go-json v0.11.2 // indirect
-	github.com/golang/geo v0.0.0-20260928092222-7d12f68cfadb // indirect
+	github.com/goccy/go-json v0.12.0 // indirect
+	github.com/golang/geo v0.0.0-20261106073233-5e8d6967632a // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/karrick/godirwalk v1.17.0 // indirect
@@ -40,9 +40,9 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	modernc.org/libc v1.79.0 // indirect
+	modernc.org/libc v1.82.2 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.12.1 // indirect
+	modernc.org/memory v1.13.0 // indirect
 )
