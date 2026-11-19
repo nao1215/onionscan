@@ -263,6 +263,7 @@ Report files are created with owner-only permissions because they can contain se
 |---|---|
 | [Unit tests](internal) | Wrong results of each package on Linux, macOS and Windows |
 | [End-to-end tests](e2e/atago/onionscan.atago.yaml) | Broken scans, reports and history of the real `onionscan` binary against a self-hosted onion service |
+| [Snapshot tests](e2e/atago/compare-snapshot.atago.yaml) | Changed text, JSON and Markdown of `onionscan compare` for a fixed scan history |
 | [Property-based tests](cmd/onionscan/compare_property_test.go) | Comparisons that misplace findings, and [secrets that reach the log](internal/log/secure_handler_property_test.go) through an unlisted path |
 | [Metamorphic tests](cmd/onionscan/compare_property_test.go) | Comparisons that disagree with the same comparison taken the other way round |
 | [Fuzzing](internal/tor/onion_test.go) | Panics and wrong verdicts on malformed onion addresses and HTML |

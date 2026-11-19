@@ -1,0 +1,9 @@
+Scan history for n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion (2 scans):
+
+  ID      Date                  Risk Summary
+  ------------------------------------------------------------
+  2       <timestamp>   C:6 H:6 M:6 L:6 I:6
+  1       <timestamp>   C:6 H:6 M:6 L:6 I:6
+
+Use 'onionscan compare <address>' to compare the latest two scans.
+Use 'onionscan compare --with-scan-id <id> <address>' to compare with a specific scan.

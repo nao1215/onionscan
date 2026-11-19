@@ -31,13 +31,14 @@ if [ -n "${COVER:-}" ]; then
 	echo "e2e: building coverage-instrumented OnionScan"
 fi
 
-echo "e2e: building OnionScan and the tornago onion service"
+echo "e2e: building OnionScan, the tornago onion service and the scan history generator"
 (
 	cd "$REPO_ROOT"
 	go build "${COVER_FLAGS[@]}" \
 		-ldflags '-X main.version=v0.0.0-e2e -X main.commit=e2e -X main.date=1970-01-01T00:00:00Z' \
 		-o "$E2E_TMP/bin/onionscan" ./cmd/onionscan
 	go build -o "$E2E_TMP/bin/onionscan-e2e-site" ./e2e/tornago-site
+	go build -o "$E2E_TMP/bin/onionscan-e2e-gendb" ./bench/gendb
 )
 
 export PATH="$E2E_TMP/bin:$PATH"

@@ -37,3 +37,6 @@ dist
 
 # rapid writes a failing case here; reproduce it with the printed seed instead
 testdata/rapid/
+
+# atago keeps the last failed scenarios here for --rerun-failed
+.atago/

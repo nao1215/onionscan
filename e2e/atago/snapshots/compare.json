@@ -1,0 +1,100 @@
+{
+  "onion_service": "n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion",
+  "previous_scan": {
+    "date_scanned": "<timestamp>",
+    "total_findings": 30,
+    "critical_count": 6,
+    "high_count": 6,
+    "medium_count": 6,
+    "low_count": 6,
+    "info_count": 6
+  },
+  "current_scan": {
+    "date_scanned": "<timestamp>",
+    "total_findings": 30,
+    "critical_count": 6,
+    "high_count": 6,
+    "medium_count": 6,
+    "low_count": 6,
+    "info_count": 6
+  },
+  "new_findings": [
+    {
+      "type": "email_address_2",
+      "severity": 0,
+      "severity_text": "INFO",
+      "title": "Email address exposed",
+      "description": "An email address was found in the page content.",
+      "impact": "An email address can link the service to its operator.",
+      "recommendation": "Remove the address or use one that is not tied to an identity.",
+      "value": "user30@example.com",
+      "location": "http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/30"
+    },
+    {
+      "type": "email_address_3",
+      "severity": 1,
+      "severity_text": "LOW",
+      "title": "Email address exposed",
+      "description": "An email address was found in the page content.",
+      "impact": "An email address can link the service to its operator.",
+      "recommendation": "Remove the address or use one that is not tied to an identity.",
+      "value": "user31@example.com",
+      "location": "http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/31"
+    },
+    {
+      "type": "email_address_4",
+      "severity": 2,
+      "severity_text": "MEDIUM",
+      "title": "Email address exposed",
+      "description": "An email address was found in the page content.",
+      "impact": "An email address can link the service to its operator.",
+      "recommendation": "Remove the address or use one that is not tied to an identity.",
+      "value": "user32@example.com",
+      "location": "http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/32"
+    }
+  ],
+  "resolved_findings": [
+    {
+      "type": "email_address_0",
+      "severity": 0,
+      "severity_text": "INFO",
+      "title": "Email address exposed",
+      "description": "An email address was found in the page content.",
+      "impact": "An email address can link the service to its operator.",
+      "recommendation": "Remove the address or use one that is not tied to an identity.",
+      "value": "user0@example.com",
+      "location": "http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/0"
+    },
+    {
+      "type": "email_address_1",
+      "severity": 1,
+      "severity_text": "LOW",
+      "title": "Email address exposed",
+      "description": "An email address was found in the page content.",
+      "impact": "An email address can link the service to its operator.",
+      "recommendation": "Remove the address or use one that is not tied to an identity.",
+      "value": "user1@example.com",
+      "location": "http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/1"
+    },
+    {
+      "type": "email_address_2",
+      "severity": 2,
+      "severity_text": "MEDIUM",
+      "title": "Email address exposed",
+      "description": "An email address was found in the page content.",
+      "impact": "An email address can link the service to its operator.",
+      "recommendation": "Remove the address or use one that is not tied to an identity.",
+      "value": "user2@example.com",
+      "location": "http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/2"
+    }
+  ],
+  "unchanged_count": 27,
+  "risk_change": {
+    "direction": "unchanged",
+    "critical_delta": 0,
+    "high_delta": 0,
+    "medium_delta": 0,
+    "low_delta": 0,
+    "info_delta": 0
+  }
+}

@@ -26,6 +26,14 @@ The real-Tor Go integration tests kept for focused debugging are opt-in:
 make test-integration
 ```
 
+## Snapshot tests
+
+`e2e/atago/compare-snapshot.atago.yaml` writes a fixed scan history with `bench/gendb` (two scans of 30 findings, three new and three resolved) and pins the output of `onionscan compare` in text, JSON and Markdown, and of `compare --list`, to the files in `e2e/atago/snapshots/`. atago replaces the scan dates with a placeholder. The suite needs neither Tor nor the network and runs with `make e2e`. After an intended change of the output, put a fresh `onionscan` and `onionscan-e2e-gendb` (built from `./bench/gendb`) on `PATH`, refresh the files and review the diff:
+
+```shell
+atago snapshot update e2e/atago/compare-snapshot.atago.yaml
+```
+
 ## Property-based and metamorphic tests
 
 Written with [rapid](https://github.com/flyingmutant/rapid). Every `go test` draws 100 cases per property; the nightly `rapid properties` job of `.github/workflows/fuzz.yml` draws 100 000. A failure prints the seed and writes the case under the package's `testdata/rapid/`.
