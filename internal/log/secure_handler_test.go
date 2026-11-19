@@ -325,6 +325,76 @@ func TestSecureHandler_WithAttrs(t *testing.T) {
 	}
 }
 
+// loginValuer hides its fields behind slog.LogValuer, as types that log
+// themselves as a group do.
+type loginValuer struct{ user, password string }
+
+func (l loginValuer) LogValue() slog.Value {
+	return slog.GroupValue(slog.String("user", l.user), slog.String("password", l.password))
+}
+
+// tokenValuer resolves to a string value.
+type tokenValuer string
+
+func (t tokenValuer) LogValue() slog.Value { return slog.StringValue(string(t)) }
+
+// TestSecureHandler_SanitizesLogValuers tests that a value behind a
+// slog.LogValuer is resolved before it is checked, on the record and through
+// WithAttrs.
+func TestSecureHandler_SanitizesLogValuers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		log    func(*slog.Logger)
+		secret string
+		keep   string
+	}{
+		{
+			name:   "group with a sensitive key on the record",
+			log:    func(l *slog.Logger) { l.Info("login", "login", loginValuer{user: "alice", password: "hunter2"}) },
+			secret: "hunter2",
+			keep:   "alice",
+		},
+		{
+			name:   "group with a sensitive key through WithAttrs",
+			log:    func(l *slog.Logger) { l.With("login", loginValuer{user: "bob", password: "swordfish"}).Info("login") },
+			secret: "swordfish",
+			keep:   "bob",
+		},
+		{
+			name:   "string matching a secret pattern",
+			log:    func(l *slog.Logger) { l.Info("request", "header", tokenValuer("Bearer abc.def")) },
+			secret: "abc.def",
+		},
+		{
+			name: "group nested in a group",
+			log: func(l *slog.Logger) {
+				l.Info("request", slog.Group("outer", slog.Any("login", loginValuer{user: "carol", password: "letmein"})))
+			},
+			secret: "letmein",
+			keep:   "carol",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			tt.log(NewSecureLogger(&buf, true))
+			output := buf.String()
+
+			if strings.Contains(output, tt.secret) {
+				t.Errorf("expected %q to be masked, but found in output: %s", tt.secret, output)
+			}
+			if tt.keep != "" && !strings.Contains(output, tt.keep) {
+				t.Errorf("expected %q to be visible, but not found in output: %s", tt.keep, output)
+			}
+		})
+	}
+}
+
 // TestSecureHandler_WithGroup tests that WithGroup works correctly.
 func TestSecureHandler_WithGroup(t *testing.T) {
 	t.Parallel()
