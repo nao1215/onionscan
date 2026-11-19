@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -278,6 +280,43 @@ func TestCompareReports(t *testing.T) {
 				t.Errorf("RiskChange.Direction: got %q, want %q", result.RiskChange.Direction, tt.wantDirection)
 			}
 		})
+	}
+}
+
+func TestCompareReportsListsNewAndResolvedFindingsInReportOrder(t *testing.T) {
+	t.Parallel()
+
+	emails := func(prefix string) []model.Finding {
+		findings := make([]model.Finding, 0, 8)
+		for i := range 8 {
+			findings = append(findings, model.Finding{
+				Type:         "email_address",
+				Value:        fmt.Sprintf("%s%d@example.com", prefix, i),
+				Severity:     model.SeverityMedium,
+				SeverityText: "Medium",
+			})
+		}
+		return findings
+	}
+	previous := &model.OnionScanReport{
+		HiddenService: "test.onion",
+		SimpleReport:  &model.SimpleReport{Findings: emails("old")},
+	}
+	current := &model.OnionScanReport{
+		HiddenService: "test.onion",
+		SimpleReport:  &model.SimpleReport{Findings: emails("new")},
+	}
+
+	// The same history must print the same comparison every time, so the
+	// order cannot depend on map iteration.
+	for range 20 {
+		result := compareReports(previous, current)
+		if !slices.Equal(result.NewFindings, current.SimpleReport.Findings) {
+			t.Fatalf("NewFindings not in the current report's order: %v", result.NewFindings)
+		}
+		if !slices.Equal(result.ResolvedFindings, previous.SimpleReport.Findings) {
+			t.Fatalf("ResolvedFindings not in the previous report's order: %v", result.ResolvedFindings)
+		}
 	}
 }
 

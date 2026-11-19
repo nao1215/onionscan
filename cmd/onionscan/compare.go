@@ -421,34 +421,42 @@ func compareReports(previous, current *model.OnionScanReport) *ComparisonResult 
 		result.CurrentScan = ScanMetadata{DateScanned: current.DateScanned}
 	}
 
-	// Build finding maps for comparison
-	previousFindings := make(map[string]model.Finding)
-	currentFindings := make(map[string]model.Finding)
-
+	// The maps only answer "is this finding in the other scan". The results
+	// are built by walking the report slices, so new findings keep the order
+	// of the current scan and resolved findings the order of the previous
+	// one, and the same history always prints the same comparison.
+	var previousList, currentList []model.Finding
 	if previous.SimpleReport != nil {
-		for _, f := range previous.SimpleReport.Findings {
-			key := findingKey(f)
-			previousFindings[key] = f
-		}
+		previousList = previous.SimpleReport.Findings
 	}
-
 	if current.SimpleReport != nil {
-		for _, f := range current.SimpleReport.Findings {
-			key := findingKey(f)
-			currentFindings[key] = f
-		}
+		currentList = current.SimpleReport.Findings
 	}
+	previousFindings := findingKeySet(previousList)
+	currentFindings := findingKeySet(currentList)
 
 	// Find new findings (in current but not in previous)
-	for key, finding := range currentFindings {
-		if _, exists := previousFindings[key]; !exists {
+	seen := make(map[string]bool, len(currentList))
+	for _, finding := range currentList {
+		key := findingKey(finding)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if !previousFindings[key] {
 			result.NewFindings = append(result.NewFindings, finding)
 		}
 	}
 
 	// Find resolved findings (in previous but not in current)
-	for key, finding := range previousFindings {
-		if _, exists := currentFindings[key]; !exists {
+	clear(seen)
+	for _, finding := range previousList {
+		key := findingKey(finding)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if !currentFindings[key] {
 			result.ResolvedFindings = append(result.ResolvedFindings, finding)
 		} else {
 			result.UnchangedCount++
@@ -459,6 +467,15 @@ func compareReports(previous, current *model.OnionScanReport) *ComparisonResult 
 	result.RiskChange = calculateRiskChange(result.PreviousScan, result.CurrentScan)
 
 	return result
+}
+
+// findingKeySet returns the keys of findings.
+func findingKeySet(findings []model.Finding) map[string]bool {
+	keys := make(map[string]bool, len(findings))
+	for _, f := range findings {
+		keys[findingKey(f)] = true
+	}
+	return keys
 }
 
 // findingKey generates a unique key for a finding for comparison purposes.
