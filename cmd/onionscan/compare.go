@@ -436,7 +436,7 @@ func compareReports(previous, current *model.OnionScanReport) *ComparisonResult 
 	currentFindings := findingKeySet(currentList)
 
 	// Find new findings (in current but not in previous)
-	seen := make(map[string]bool, len(currentList))
+	seen := make(map[comparisonKey]bool, len(currentList))
 	for _, finding := range currentList {
 		key := findingKey(finding)
 		if seen[key] {
@@ -470,17 +470,26 @@ func compareReports(previous, current *model.OnionScanReport) *ComparisonResult 
 }
 
 // findingKeySet returns the keys of findings.
-func findingKeySet(findings []model.Finding) map[string]bool {
-	keys := make(map[string]bool, len(findings))
+func findingKeySet(findings []model.Finding) map[comparisonKey]bool {
+	keys := make(map[comparisonKey]bool, len(findings))
 	for _, f := range findings {
 		keys[findingKey(f)] = true
 	}
 	return keys
 }
 
+// comparisonKey identifies a finding across two scans: the same type, value
+// and location. The fields are kept apart rather than joined into one string,
+// so values that contain a separator cannot make two findings look the same.
+type comparisonKey struct {
+	findingType string
+	value       string
+	location    string
+}
+
 // findingKey generates a unique key for a finding for comparison purposes.
-func findingKey(f model.Finding) string {
-	return f.Type + "|" + f.Value + "|" + f.Location
+func findingKey(f model.Finding) comparisonKey {
+	return comparisonKey{findingType: f.Type, value: f.Value, location: f.Location}
 }
 
 // calculateRiskChange calculates the change in risk between two scans.

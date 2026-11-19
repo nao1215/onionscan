@@ -320,28 +320,56 @@ func TestCompareReportsListsNewAndResolvedFindingsInReportOrder(t *testing.T) {
 	}
 }
 
+func TestCompareReportsKeepsFindingsApartWhenTheirFieldsContainTheSeparator(t *testing.T) {
+	t.Parallel()
+
+	// Joined with "|", both findings read "email_address|a|b|c".
+	resolved := model.Finding{Type: "email_address", Value: "a|b", Location: "c"}
+	added := model.Finding{Type: "email_address", Value: "a", Location: "b|c"}
+	previous := &model.OnionScanReport{
+		HiddenService: "test.onion",
+		SimpleReport:  &model.SimpleReport{Findings: []model.Finding{resolved}},
+	}
+	current := &model.OnionScanReport{
+		HiddenService: "test.onion",
+		SimpleReport:  &model.SimpleReport{Findings: []model.Finding{added}},
+	}
+
+	result := compareReports(previous, current)
+
+	if !slices.Equal(result.NewFindings, []model.Finding{added}) {
+		t.Errorf("NewFindings: got %v, want [%v]", result.NewFindings, added)
+	}
+	if !slices.Equal(result.ResolvedFindings, []model.Finding{resolved}) {
+		t.Errorf("ResolvedFindings: got %v, want [%v]", result.ResolvedFindings, resolved)
+	}
+	if result.UnchangedCount != 0 {
+		t.Errorf("UnchangedCount: got %d, want 0", result.UnchangedCount)
+	}
+}
+
 func TestFindingKey(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
 		finding model.Finding
-		want    string
+		want    comparisonKey
 	}{
 		{
 			name:    "generates key with all fields",
 			finding: model.Finding{Type: "email", Value: "test@example.com", Location: "/page"},
-			want:    "email|test@example.com|/page",
+			want:    comparisonKey{findingType: "email", value: "test@example.com", location: "/page"},
 		},
 		{
 			name:    "handles empty location",
 			finding: model.Finding{Type: "email", Value: "test@example.com"},
-			want:    "email|test@example.com|",
+			want:    comparisonKey{findingType: "email", value: "test@example.com"},
 		},
 		{
 			name:    "handles empty value",
 			finding: model.Finding{Type: "open_directory", Location: "/uploads"},
-			want:    "open_directory||/uploads",
+			want:    comparisonKey{findingType: "open_directory", location: "/uploads"},
 		},
 	}
 
@@ -351,7 +379,7 @@ func TestFindingKey(t *testing.T) {
 
 			got := findingKey(tt.finding)
 			if got != tt.want {
-				t.Errorf("findingKey() = %q, want %q", got, tt.want)
+				t.Errorf("findingKey() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}
