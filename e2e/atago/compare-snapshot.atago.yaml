@@ -1,0 +1,46 @@
+# Golden output of `onionscan compare`. The scan history is written by
+# onionscan-e2e-gendb (bench/gendb), which writes the same two scans for the
+# same arguments, so the text, JSON and Markdown reports are fully determined
+# and pinned byte for byte. This suite needs neither Tor nor the network.
+# Refresh intentionally changed goldens with:
+#   atago snapshot update e2e/atago/compare-snapshot.atago.yaml
+version: "1"
+
+suite:
+  name: onionscan compare golden output (offline)
+
+scenarios:
+  - name: compare prints the same report in every format for a fixed history
+    env:
+      HOME: "${workdir}/home"
+      XDG_CONFIG_HOME: "${workdir}/home/.config"
+      XDG_DATA_HOME: "${workdir}/home/.local/share"
+    steps:
+      - run:
+          command: onionscan-e2e-gendb -findings 30 -dir ${workdir}/home/.local/share/onionscan
+      - assert:
+          exit_code: 0
+      - run:
+          command: onionscan compare n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion
+      - assert:
+          exit_code: 0
+          stdout:
+            snapshot: snapshots/compare.txt
+      - run:
+          command: onionscan compare --json n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion
+      - assert:
+          exit_code: 0
+          stdout:
+            snapshot: snapshots/compare.json
+      - run:
+          command: onionscan compare --markdown n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion
+      - assert:
+          exit_code: 0
+          stdout:
+            snapshot: snapshots/compare.md
+      - run:
+          command: onionscan compare --list n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion
+      - assert:
+          exit_code: 0
+          stdout:
+            snapshot: snapshots/compare-list.txt

@@ -1,0 +1,33 @@
+Scan Comparison: n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion
+============================================================
+
+Risk Status: UNCHANGED
+
+Previous scan: <timestamp>
+Current scan:  <timestamp>
+
+Findings Summary:
+  Severity    Previous    Current     Change    
+  ---------------------------------------------
+  Critical    6           6           0         
+  High        6           6           0         
+  Medium      6           6           0         
+  Low         6           6           0         
+  Info        6           6           0         
+  ---------------------------------------------
+  Total       30          30          0         
+
+New Findings (3):
+  [+] [INFO] Email address exposed: user30@example.com
+      Location: http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/30
+  [+] [LOW] Email address exposed: user31@example.com
+      Location: http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/31
+  [+] [MEDIUM] Email address exposed: user32@example.com
+      Location: http://n5xgs33oonrwc3ranbuw233snfwwkidcmvxgg2dnmfzgwidlmv4twaad.onion/page/32
+
+Resolved Findings (3):
+  [-] [INFO] Email address exposed: user0@example.com
+  [-] [LOW] Email address exposed: user1@example.com
+  [-] [MEDIUM] Email address exposed: user2@example.com
+
+Unchanged: 27 findings
