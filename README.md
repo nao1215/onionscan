@@ -20,9 +20,9 @@
 
 ![OnionScan logo](./doc/images/logo.png)
 
-OnionScan audits Tor v3 onion services for operational-security mistakes, exposed identity signals, vulnerable server configuration, and unexpected network services. It starts Tor for you or uses an existing SOCKS5 proxy, crawls the target, runs focused analyzers, and writes text, JSON, or Markdown reports.
+OnionScan audits Tor v3 onion services for leaked identity, weak server configuration, and exposed network services. It starts Tor or uses an existing SOCKS5 proxy, crawls the target, and writes a text, JSON, or Markdown report.
 
-This is a modern Go rewrite inspired by [s-rah/onionscan](https://github.com/s-rah/onionscan). It supports current 56-character onion addresses, concurrent scans, per-site configuration, scan history, and comparison reports.
+It is a Go rewrite inspired by [s-rah/onionscan](https://github.com/s-rah/onionscan), with support for 56-character v3 addresses, concurrent scans, per-site configuration, and comparison against earlier scans.
 
 > [!IMPORTANT]
 > Use OnionScan only for services you own or are explicitly authorized to assess. You are responsible for complying with applicable laws and the target owner's rules.
@@ -39,7 +39,7 @@ This is a modern Go rewrite inspired by [s-rah/onionscan](https://github.com/s-r
 | Web hardening | Security headers, CSP, cookies, TLS, Apache status pages |
 | Network services | HTTP, HTTPS, SSH, FTP, SMTP, MongoDB, Redis, PostgreSQL, MySQL |
 
-The crawler supports configurable depth, page limits, delays, response-size limits, headers, cookies, and allow or ignore patterns. Sensitive values in logs are redacted automatically.
+The crawler supports configurable depth, page limits, delays, response-size limits, headers, cookies, and allow or ignore patterns. OnionScan redacts sensitive values in its logs.
 
 ## Requirements
 
@@ -100,13 +100,9 @@ Release archives are available from the [GitHub Releases page](https://github.co
 
 ## Verifying release integrity
 
-Releases from v0.2.5 on ship supply-chain metadata so you can verify what you download:
+Releases from v0.2.5 on include `checksums.txt` signed keyless with [cosign](https://github.com/sigstore/cosign) (`checksums.txt.sigstore.json`), an SPDX SBOM per archive (`<archive>.sbom.json`), and SLSA build provenance attested through GitHub OIDC and attached as `multiple.intoto.jsonl`.
 
-- Signed checksums: `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless), producing `checksums.txt.sigstore.json`.
-- SBOM: an SPDX Software Bill of Materials is attached to each release archive as `<archive>.sbom.json`.
-- Build provenance: SLSA build provenance is attested via GitHub OIDC, and is also attached to the release as `multiple.intoto.jsonl`.
-
-Verify the signed checksums (then check your archive against `checksums.txt`):
+Verify the signed checksums, then your archive:
 
 ```shell
 cosign verify-blob \
@@ -117,13 +113,13 @@ cosign verify-blob \
 sha256sum --check --ignore-missing checksums.txt
 ```
 
-Verify the build provenance of a downloaded artifact with the GitHub CLI:
+Verify the build provenance with the GitHub CLI:
 
 ```shell
 gh attestation verify onionscan_<version>_<os>_<arch>.tar.gz --repo nao1215/onionscan
 ```
 
-Or download the `multiple.intoto.jsonl` release asset and verify the archive against it with [slsa-verifier](https://github.com/slsa-framework/slsa-verifier), which checks the provenance signature against the Sigstore transparency log:
+Or verify the archive against `multiple.intoto.jsonl` with [slsa-verifier](https://github.com/slsa-framework/slsa-verifier):
 
 ```shell
 slsa-verifier verify-artifact onionscan_<version>_<os>_<arch>.tar.gz \
@@ -134,7 +130,7 @@ slsa-verifier verify-artifact onionscan_<version>_<os>_<arch>.tar.gz \
 
 ## Quick start
 
-Scan one service with an automatically managed Tor process:
+Scan one service. OnionScan starts and stops its own Tor process:
 
 ```shell
 onionscan scan your-service.onion
@@ -152,7 +148,7 @@ Scan several services concurrently:
 onionscan scan --batch 3 first-service.onion second-service.onion third-service.onion
 ```
 
-Write machine-readable or review-friendly reports:
+Write a JSON or Markdown report:
 
 ```shell
 onionscan scan --json --output report.json your-service.onion
@@ -194,7 +190,7 @@ When `--batch` is greater than `1`, site-specific cookies, headers, and depth se
 
 ## Configuration
 
-Create a documented starter file:
+Create a starter file with comments:
 
 ```shell
 onionscan init
@@ -227,7 +223,7 @@ Restrict configuration-file permissions because cookies and authorization header
 
 ## Scan history and comparison
 
-Every scan is stored in a local SQLite database. The location follows the XDG conventions used by the operating system.
+Every scan is stored in a local SQLite database:
 
 | Platform | Default database path |
 |----------|-----------------------|
@@ -247,15 +243,11 @@ onionscan compare --json your-service.onion
 onionscan compare --markdown your-service.onion
 ```
 
-Comparison reports identify new, resolved, and unchanged findings and summarize whether risk improved, worsened, or stayed unchanged.
+A comparison lists new, resolved, and unchanged findings and says whether the risk went up, down, or stayed the same.
 
 ## Reports
 
-The default text report is designed for terminals. JSON preserves structured scan data for automation. Markdown produces a reviewable report with severity summaries and detailed findings.
-
-See [the Markdown report example](./doc/markdown-report.md).
-
-Report files are created with owner-only permissions because they can contain sensitive findings.
+The default is a text report for the terminal. JSON keeps the structured scan data for scripts, and Markdown adds severity summaries; see [the Markdown report example](./doc/markdown-report.md). Report files are created with owner-only permissions because they can hold sensitive findings.
 
 ## Testing
 
@@ -305,7 +297,7 @@ When `--config` is present, OnionScan treats a missing file as an error. Remove 
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a change. Security reports should follow [SECURITY.md](./SECURITY.md).
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a change, and send security reports as described in [SECURITY.md](./SECURITY.md).
 
 If OnionScan is useful to you, star the repository or [sponsor the maintainer](https://github.com/sponsors/nao1215).
 
